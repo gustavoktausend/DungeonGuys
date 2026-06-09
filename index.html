@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DUNGEON CRAWLER — Pixel Shooter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="ui-overlay">
+    <!-- START SCREEN -->
+    <div id="start-screen" class="screen active">
+      <div class="screen-inner">
+        <div class="title-block">
+          <div class="title-glow">DUNGEON</div>
+          <div class="title-main">CRAWLER</div>
+          <div class="title-sub">◆ PIXEL SHOOTER ◆</div>
+        </div>
+        <div class="instructions">
+          <div class="inst-row"><span class="key">WASD</span><span>/ ARROWS — MOVE</span></div>
+          <div class="inst-row"><span class="key">MOUSE</span><span>— AIM &amp; SHOOT</span></div>
+          <div class="inst-row"><span class="key">ESC</span><span>— PAUSE</span></div>
+          <div class="inst-row"><span class="key">GOLD</span><span>— COLLECT COINS</span></div>
+        </div>
+        <button id="btn-start" class="btn-pixel">▶ START GAME</button>
+        <div class="footer-hint">Survive the waves. Collect gold. Die gloriously.</div>
+      </div>
+    </div>
+
+    <!-- PAUSE SCREEN -->
+    <div id="pause-screen" class="screen">
+      <div class="screen-inner compact">
+        <div class="pause-title">— PAUSED —</div>
+        <button id="btn-resume" class="btn-pixel">▶ RESUME</button>
+        <button id="btn-quit" class="btn-pixel secondary">✕ QUIT</button>
+      </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="gameover-screen" class="screen">
+      <div class="screen-inner compact">
+        <div class="gameover-title">YOU DIED</div>
+        <div class="skull">☠</div>
+        <div class="stats-block">
+          <div class="stat-row"><span>SCORE</span><span id="final-score">0</span></div>
+          <div class="stat-row"><span>WAVE</span><span id="final-wave">0</span></div>
+          <div class="stat-row"><span>GOLD</span><span id="final-gold">0</span></div>
+        </div>
+        <button id="btn-restart" class="btn-pixel">↺ PLAY AGAIN</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD (visible during gameplay) -->
+  <div id="hud" class="hidden">
+    <div id="hud-left">
+      <div class="hud-label">HP</div>
+      <div id="hp-bar-wrap"><div id="hp-bar"></div></div>
+    </div>
+    <div id="hud-center">
+      <div class="hud-label">WAVE</div>
+      <div id="wave-display">1</div>
+    </div>
+    <div id="hud-right">
+      <div class="hud-label">SCORE</div>
+      <div id="score-display">0</div>
+      <div class="hud-label gold-label">GOLD</div>
+      <div id="gold-display">0</div>
+    </div>
+  </div>
+
+  <!-- Wave announcement -->
+  <div id="wave-announce" class="hidden"></div>
+
+  <canvas id="game-canvas"></canvas>
+  <script src="game.js"></script>
+</body>
+</html>
