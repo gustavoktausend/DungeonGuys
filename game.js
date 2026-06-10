@@ -1,10 +1,26 @@
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TILE   = 32;
-const BULLET_SPEED  = 7;
-const BULLET_RANGE  = 380;
-const PLAYER_SPEED  = 2.6;
-const FIRE_RATE     = 220; // ms between shots
 const COIN_MAGNET   = 80;  // px radius auto-collect
+
+// ─── Classes (Brotato-style) ──────────────────────────────────────────────────
+const CLASS_DEFS = {
+  mage: {
+    hp: 100, speed: 2.6, fireRate: 220,
+    attack: 'bolt',
+    bulletSpeed: 7, range: 380, damage: [25, 35], pierce: 0,
+  },
+  archer: {
+    hp: 80, speed: 3.0, fireRate: 380,
+    attack: 'arrow',
+    bulletSpeed: 11, range: 560, damage: [30, 42], pierce: 2,
+  },
+  warrior: {
+    hp: 150, speed: 2.8, fireRate: 420,
+    attack: 'melee',
+    range: 58, damage: [45, 62], arc: Math.PI * 0.65, knockback: 14,
+  },
+};
+let selectedClass = 'mage';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let canvas, ctx;
@@ -12,11 +28,12 @@ let gameState = 'start'; // start | playing | paused | gameover
 let lastTime   = 0;
 let animId     = null;
 
-let player, bullets, enemies, coins, particles;
+let player, bullets, enemies, coins, particles, meleeSwings;
 let score, gold, wave, waveTimer, waveActive;
 let nextWaveDelay = 3000;
 let spawnQueue   = [];
 let mouse        = { x: 0, y: 0 };
+let mouseDown    = false;
 let keys         = {};
 let lastShot     = 0;
 let tileMap      = [];
@@ -43,6 +60,14 @@ document.getElementById('btn-resume').addEventListener('click',  resumeGame);
 document.getElementById('btn-quit').addEventListener('click',    quitGame);
 document.getElementById('btn-restart').addEventListener('click', startGame);
 
+document.querySelectorAll('.class-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedClass = card.dataset.class;
+  });
+});
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   canvas = document.getElementById('game-canvas');
@@ -52,7 +77,8 @@ window.addEventListener('load', () => {
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup',   e => { keys[e.code] = false; });
   canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
-  canvas.addEventListener('mousedown', e => { if (e.button === 0) shoot(); });
+  canvas.addEventListener('mousedown', e => { if (e.button === 0) { mouseDown = true; attack(); } });
+  window.addEventListener('mouseup',   e => { if (e.button === 0) mouseDown = false; });
   showScreen('start');
 });
 
@@ -100,18 +126,22 @@ function startGame() {
   wave       = 0;
   waveActive = false;
   waveTimer  = 0;
-  spawnQueue = [];
-  bullets    = [];
-  enemies    = [];
-  coins      = [];
-  particles  = [];
+  spawnQueue  = [];
+  bullets     = [];
+  enemies     = [];
+  coins       = [];
+  particles   = [];
+  meleeSwings = [];
 
+  const cls = CLASS_DEFS[selectedClass];
   player = {
     x: canvas.width  / 2,
     y: canvas.height / 2,
     w: 20, h: 20,
-    hp: 100, maxHp: 100,
-    speed: PLAYER_SPEED,
+    hp: cls.hp, maxHp: cls.hp,
+    speed: cls.speed,
+    cls: selectedClass,
+    def: cls,
     invincible: 0,
     facing: 0,
     walkFrame: 0,
@@ -191,6 +221,7 @@ function loop(ts) {
 function update(dt) {
   updatePlayer(dt);
   updateBullets(dt);
+  updateMeleeSwings(dt);
   updateEnemies(dt);
   updateCoins(dt);
   updateParticles(dt);
@@ -226,29 +257,83 @@ function updatePlayer(dt) {
   // face toward mouse
   p.facing = Math.atan2(mouse.y - p.y, mouse.x - p.x);
 
-  // auto-fire on hold
-  if (keys['Space'] || keys['KeyZ']) {
-    const now = performance.now();
-    if (now - lastShot > FIRE_RATE) { shoot(); lastShot = now; }
+  // auto-fire on hold (mouse or keys)
+  if (mouseDown || keys['Space'] || keys['KeyZ']) {
+    attack();
   }
 }
 
-function shoot() {
+function attack() {
   if (gameState !== 'playing') return;
+  const def = player.def;
   const now = performance.now();
-  if (now - lastShot < FIRE_RATE) return;
+  if (now - lastShot < def.fireRate) return;
   lastShot = now;
 
   const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-  const spread = (Math.random() - 0.5) * 0.04;
-  bullets.push({
-    x: player.x,
-    y: player.y,
-    vx: Math.cos(angle + spread) * BULLET_SPEED,
-    vy: Math.sin(angle + spread) * BULLET_SPEED,
-    dist: 0,
-    dead: false,
-  });
+  if (def.attack === 'melee') {
+    meleeAttack(angle);
+  } else {
+    const spread = (Math.random() - 0.5) * 0.04;
+    bullets.push({
+      x: player.x,
+      y: player.y,
+      vx: Math.cos(angle + spread) * def.bulletSpeed,
+      vy: Math.sin(angle + spread) * def.bulletSpeed,
+      angle: angle + spread,
+      speed: def.bulletSpeed,
+      range: def.range,
+      damage: def.damage,
+      pierce: def.pierce,
+      type: def.attack, // 'bolt' | 'arrow'
+      hitIds: new Set(),
+      dist: 0,
+      dead: false,
+    });
+  }
+}
+
+// ─── Melee ────────────────────────────────────────────────────────────────────
+function meleeAttack(angle) {
+  const def = player.def;
+  meleeSwings.push({ angle, life: 1 });
+  spawnParticles(
+    player.x + Math.cos(angle) * def.range * 0.6,
+    player.y + Math.sin(angle) * def.range * 0.6,
+    '#ffe066', 4
+  );
+
+  for (const e of enemies) {
+    if (e.dead) continue;
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > def.range + Math.max(e.w, e.h) / 2) continue;
+
+    let diff = Math.atan2(dy, dx) - angle;
+    while (diff >  Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    if (Math.abs(diff) > def.arc / 2) continue;
+
+    e.hp -= rollDamage(def.damage);
+    e.hitFlash = 150;
+    // knockback away from player
+    if (dist > 1) {
+      e.x += (dx / dist) * def.knockback;
+      e.y += (dy / dist) * def.knockback;
+    }
+    spawnParticles(e.x, e.y, '#ff4444', 6);
+    if (e.hp <= 0) killEnemy(e);
+  }
+}
+
+function updateMeleeSwings(dt) {
+  for (const s of meleeSwings) s.life -= dt / 180;
+  meleeSwings = meleeSwings.filter(s => s.life > 0);
+}
+
+function rollDamage([min, max]) {
+  return min + Math.floor(Math.random() * (max - min + 1));
 }
 
 // Bullets
@@ -258,9 +343,9 @@ function updateBullets(dt) {
     if (b.dead) continue;
     b.x    += b.vx * factor;
     b.y    += b.vy * factor;
-    b.dist += BULLET_SPEED * factor;
+    b.dist += b.speed * factor;
 
-    if (b.dist > BULLET_RANGE ||
+    if (b.dist > b.range ||
         b.x < 0 || b.x > canvas.width ||
         b.y < 0 || b.y > canvas.height) {
       b.dead = true;
@@ -269,13 +354,19 @@ function updateBullets(dt) {
     }
 
     for (const e of enemies) {
-      if (e.dead) continue;
+      if (e.dead || b.hitIds.has(e)) continue;
       if (rectCircle(e.x, e.y, e.w, e.h, b.x, b.y, 5)) {
-        e.hp -= 25 + Math.floor(Math.random() * 10);
-        b.dead = true;
+        e.hp -= rollDamage(b.damage);
+        e.hitFlash = 150;
+        b.hitIds.add(e);
         spawnParticles(b.x, b.y, '#ff4444', 6);
         if (e.hp <= 0) killEnemy(e);
-        break;
+        if (b.pierce > 0) {
+          b.pierce--;
+        } else {
+          b.dead = true;
+          break;
+        }
       }
     }
   }
@@ -471,6 +562,7 @@ function render() {
   drawTorches();
   drawCoins();
   drawBullets();
+  drawMeleeSwings();
   drawEnemies();
   drawPlayer();
   drawParticles();
@@ -561,14 +653,66 @@ function drawTorches() {
 // Bullets
 function drawBullets() {
   for (const b of bullets) {
-    // glow
+    if (b.type === 'arrow') {
+      // wooden shaft + green-glow tip
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.angle);
+      ctx.fillStyle = '#8B6914';
+      ctx.fillRect(-8, -1, 14, 2);
+      // fletching
+      ctx.fillStyle = '#2ecc71';
+      ctx.fillRect(-8, -3, 3, 6);
+      // tip
+      ctx.shadowColor = '#2ecc71';
+      ctx.shadowBlur  = 6;
+      ctx.fillStyle   = '#d4c9a8';
+      ctx.beginPath();
+      ctx.moveTo(6, -3);
+      ctx.lineTo(10, 0);
+      ctx.lineTo(6, 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    } else {
+      // magic bolt
+      ctx.shadowColor = '#ff8c00';
+      ctx.shadowBlur  = 8;
+      ctx.fillStyle   = '#ffe066';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+}
+
+// Melee swing arcs
+function drawMeleeSwings() {
+  const def = CLASS_DEFS.warrior;
+  for (const s of meleeSwings) {
+    const progress = 1 - s.life; // 0 → 1
+    const sweep    = def.arc;
+    // arc sweeps from one edge to the other as life decays
+    const start = s.angle - sweep / 2;
+    const end   = start + sweep * Math.min(1, progress * 2.2);
+
+    ctx.save();
+    ctx.globalAlpha = s.life * 0.85;
+    ctx.strokeStyle = '#ffe066';
     ctx.shadowColor = '#ff8c00';
-    ctx.shadowBlur  = 8;
-    ctx.fillStyle   = '#ffe066';
+    ctx.shadowBlur  = 12;
+    ctx.lineWidth   = 5;
     ctx.beginPath();
-    ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.arc(player.x, player.y, def.range - 6, start, end);
+    ctx.stroke();
+    ctx.lineWidth   = 2;
+    ctx.strokeStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, def.range - 12, start, end);
+    ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -707,27 +851,61 @@ function drawPlayer() {
 
   const bob = Math.sin(p.walkFrame * Math.PI / 2) * 1.5;
 
+  const OUTFITS = {
+    mage:    { body: '#1a3a5c', hood: '#162d47' },
+    archer:  { body: '#1a5c3a', hood: '#14472d' },
+    warrior: { body: '#5c2a1a', hood: '#472016' },
+  };
+  const outfit = OUTFITS[p.cls] || OUTFITS.mage;
+
   // cloak / body
-  px(ctx, -6, -2 + bob, 12, 12, '#1a3a5c');
+  px(ctx, -6, -2 + bob, 12, 12, outfit.body);
   // head
   px(ctx, -5, -12 + bob, 10, 10, '#f0d0a0');
   // hood
-  px(ctx, -6, -14 + bob, 12, 6, '#162d47');
+  px(ctx, -6, -14 + bob, 12, 6, outfit.hood);
   // eyes
   px(ctx, -3, -10 + bob, 2, 2, '#ffffff');
   px(ctx,  1,  -10 + bob, 2, 2, '#ffffff');
-  // weapon (staff on right side)
-  ctx.fillStyle = '#8B6914';
-  ctx.fillRect(7, -16 + bob, 2, 22);
-  ctx.shadowColor = '#4af';
-  ctx.shadowBlur  = 10;
-  ctx.fillStyle   = '#66ccff';
-  ctx.fillRect(6, -18 + bob, 4, 4);
-  ctx.shadowBlur = 0;
+
+  // weapon (right side, varies by class)
+  if (p.cls === 'archer') {
+    // bow: curved arc + string
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth   = 2;
+    ctx.beginPath();
+    ctx.arc(8, -4 + bob, 9, -Math.PI / 2.4, Math.PI / 2.4);
+    ctx.stroke();
+    ctx.strokeStyle = '#d4c9a8';
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(8 + Math.cos(-Math.PI / 2.4) * 9, -4 + bob + Math.sin(-Math.PI / 2.4) * 9);
+    ctx.lineTo(8 + Math.cos( Math.PI / 2.4) * 9, -4 + bob + Math.sin( Math.PI / 2.4) * 9);
+    ctx.stroke();
+  } else if (p.cls === 'warrior') {
+    // sword: blade + crossguard + grip
+    px(ctx, 7, -20 + bob, 3, 16, '#c8d6e5');
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur  = 6;
+    px(ctx, 7, -22 + bob, 3, 3, '#ffffff');
+    ctx.shadowBlur = 0;
+    px(ctx, 4, -5 + bob, 9, 2, '#8B6914');
+    px(ctx, 7, -3 + bob, 3, 6, '#5c3a14');
+  } else {
+    // staff with glowing gem
+    ctx.fillStyle = '#8B6914';
+    ctx.fillRect(7, -16 + bob, 2, 22);
+    ctx.shadowColor = '#4af';
+    ctx.shadowBlur  = 10;
+    ctx.fillStyle   = '#66ccff';
+    ctx.fillRect(6, -18 + bob, 4, 4);
+    ctx.shadowBlur = 0;
+  }
+
   // legs
   const legOff = p.walkFrame % 2 === 0 ? 2 : -2;
-  px(ctx, -5, 10 + bob, 4, 6 + legOff, '#162d47');
-  px(ctx,  1,  10 + bob, 4, 6 - legOff, '#162d47');
+  px(ctx, -5, 10 + bob, 4, 6 + legOff, outfit.hood);
+  px(ctx,  1,  10 + bob, 4, 6 - legOff, outfit.hood);
 
   ctx.restore();
 
