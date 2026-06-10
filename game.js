@@ -139,15 +139,25 @@ function baseStats() {
     range: 0,         // flat px (melee gets half)
     speedPct: 0,      // % move speed
     luck: 0,          // % more potion drops / chest spawns
+    stamina: 0,       // flat bonus to the 100 base stamina pool
   };
 }
+
+// ─── Stamina / sprint ─────────────────────────────────────────────────────────
+const STAMINA_BASE    = 100;
+const SPRINT_MULT     = 1.55; // speed while sprinting
+const FATIGUE_MULT    = 0.7;  // speed while stamina is recovering
+const STAMINA_DRAIN   = 30;   // per second while sprinting
+const STAMINA_REGEN   = 18;   // per second while recovering
+
+function maxStamina() { return STAMINA_BASE + player.stats.stamina; }
 
 const STAT_LABELS = {
   hpRegen: 'HP REGEN', lifeSteal: 'LIFESTEAL', dmgPct: 'DAMAGE',
   meleeDmg: 'MELEE DMG', rangedDmg: 'RANGED DMG', elementalDmg: 'ELEM DMG',
   atkSpeedPct: 'ATK SPEED', crit: 'CRIT', armor: 'ARMOR',
   dodge: 'DODGE', range: 'RANGE', speedPct: 'SPEED', luck: 'LUCK',
-  maxHp: 'MAX HP',
+  stamina: 'STAMINA', maxHp: 'MAX HP',
 };
 const PCT_STATS = new Set(['dmgPct', 'atkSpeedPct', 'speedPct', 'crit', 'dodge', 'lifeSteal', 'luck']);
 
@@ -170,6 +180,8 @@ const ITEM_POOL = [
   { name: 'SHADOW CLOAK',    icon: '🌑', price: 30, mods: { dodge: 8, dmgPct: -5 } },
   { name: 'BLOOD PACT',      icon: '🩸', price: 40, mods: { meleeDmg: 4, rangedDmg: 4, elementalDmg: 4, maxHp: -15 } },
   { name: 'BERSERK TONIC',   icon: '🧪', price: 35, mods: { atkSpeedPct: 15, armor: -2 } },
+  { name: 'ENERGY DRINK',    icon: '🥤', price: 22, mods: { stamina: 30 } },
+  { name: 'IRON GREAVES',    icon: '🥾', price: 30, mods: { armor: 2, stamina: -20 } },
   { name: 'TOWER SHIELD',    icon: '🏰', price: 36, mods: { armor: 5, atkSpeedPct: -8 } },
   { name: 'CURSED SKULL',    icon: '💀', price: 38, mods: { dmgPct: 15, maxHp: -10, hpRegen: -1 } },
 ];
@@ -201,6 +213,7 @@ const screens = {
 const hud          = document.getElementById('hud');
 const hpBar        = document.getElementById('hp-bar');
 const spBar        = document.getElementById('sp-bar');
+const stBar        = document.getElementById('st-bar');
 const waveDisplay  = document.getElementById('wave-display');
 const scoreDisplay = document.getElementById('score-display');
 const goldDisplay  = document.getElementById('gold-display');
@@ -390,6 +403,9 @@ function startGame() {
     specialTimer: 0,
     stats: baseStats(),
     regenAcc: 0,
+    stamina: STAMINA_BASE,
+    sprinting: false,
+    dustTimer: 0,
     invincible: 0,
     facing: 0,
     walkFrame: 0,
@@ -530,7 +546,28 @@ function updatePlayer(dt) {
     if (p.walkTimer > 120) { p.walkFrame = (p.walkFrame + 1) % 4; p.walkTimer = 0; }
   }
 
-  const effSpeed = p.speed * (1 + p.stats.speedPct / 100);
+  // stamina: sprint on shift; recovering stamina slows you to 70%
+  const wantSprint = (keys['ShiftLeft'] || keys['ShiftRight']) && p.moving && p.stamina > 0;
+  let staminaMult = 1;
+  if (wantSprint) {
+    p.sprinting = true;
+    p.stamina   = Math.max(0, p.stamina - STAMINA_DRAIN * dt / 1000);
+    staminaMult = SPRINT_MULT;
+    // dust kicked up while sprinting
+    p.dustTimer += dt;
+    if (p.dustTimer > 90) {
+      p.dustTimer = 0;
+      spawnParticles(p.x - dx * 12, p.y + 14, 'rgba(180,170,150,0.8)', 2);
+    }
+  } else {
+    p.sprinting = false;
+    if (p.stamina < maxStamina()) {
+      p.stamina   = Math.min(maxStamina(), p.stamina + STAMINA_REGEN * dt / 1000);
+      staminaMult = FATIGUE_MULT;
+    }
+  }
+
+  const effSpeed = p.speed * (1 + p.stats.speedPct / 100) * staminaMult;
   const nx = p.x + dx * effSpeed * (dt / 16.67);
   const ny = p.y + dy * effSpeed * (dt / 16.67);
   const margin = 10;
@@ -1170,6 +1207,10 @@ function updateHUD() {
   const spPct = Math.max(0, 1 - player.specialTimer / player.def.specialCd) * 100;
   spBar.style.width = spPct + '%';
   spBar.classList.toggle('ready', spPct >= 100);
+
+  const staPct = player.stamina / maxStamina() * 100;
+  stBar.style.width = staPct + '%';
+  stBar.classList.toggle('recovering', !player.sprinting && staPct < 100);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

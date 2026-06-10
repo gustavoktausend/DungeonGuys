@@ -503,6 +503,27 @@ html, body {
   image-rendering: pixelated;
 }
 
+.st-label { margin-top: 8px; color: rgba(241,196,15,0.7); }
+
+#st-bar-wrap {
+  width: clamp(70px, 12vw, 140px);
+  height: 8px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  box-shadow: inset 0 0 4px rgba(0,0,0,0.8);
+}
+
+#st-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(to right, #d4ac0d, #f1c40f);
+  transition: width 0.1s linear;
+}
+
+#st-bar.recovering {
+  background: linear-gradient(to right, #935116, #ca6f1e);
+}
+
 .sp-label { margin-top: 8px; color: rgba(155,89,182,0.8); }
 
 #sp-bar-wrap {
