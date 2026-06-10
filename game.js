@@ -228,15 +228,22 @@ document.addEventListener('click', e => {
   if (btn) btn.blur();
 });
 
-document.getElementById('btn-start').addEventListener('click',   startGame);
-document.getElementById('btn-resume').addEventListener('click',  resumeGame);
-document.getElementById('btn-quit').addEventListener('click',    quitGame);
-document.getElementById('btn-restart').addEventListener('click', startGame);
+// keyboard-triggered clicks (Space/Enter on a focused button) have detail === 0;
+// game flow buttons only respond to real mouse clicks
+function mouseOnly(fn) {
+  return e => { if (e.detail !== 0) fn(); };
+}
 
-document.getElementById('btn-next-wave').addEventListener('click', closeShop);
-document.getElementById('btn-shop-heal').addEventListener('click', shopHeal);
-document.getElementById('btn-shop-reroll').addEventListener('click', shopReroll);
+document.getElementById('btn-start').addEventListener('click',   mouseOnly(startGame));
+document.getElementById('btn-resume').addEventListener('click',  mouseOnly(resumeGame));
+document.getElementById('btn-quit').addEventListener('click',    mouseOnly(quitGame));
+document.getElementById('btn-restart').addEventListener('click', mouseOnly(startGame));
+
+document.getElementById('btn-next-wave').addEventListener('click', mouseOnly(closeShop));
+document.getElementById('btn-shop-heal').addEventListener('click', mouseOnly(shopHeal));
+document.getElementById('btn-shop-reroll').addEventListener('click', mouseOnly(shopReroll));
 document.getElementById('shop-items').addEventListener('click', e => {
+  if (e.detail === 0) return;
   const btn = e.target.closest('.shop-item[data-i]');
   if (btn) buyOffer(Number(btn.dataset.i));
 });
@@ -256,7 +263,11 @@ window.addEventListener('load', () => {
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
   window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup',   e => { keys[e.code] = false; });
+  window.addEventListener('keyup',   e => {
+    keys[e.code] = false;
+    // button activation by Space fires on keyup — block it here too
+    if (e.code === 'Space') e.preventDefault();
+  });
   canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
   canvas.addEventListener('mousedown', e => {
     if (e.button === 0) { mouseDown = true; attack(); }
