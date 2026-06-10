@@ -1447,9 +1447,10 @@ function drawHeldWeapon(p) {
     angle = s.angle - s.arc / 2 + s.arc * progress;
   }
 
-  const dist = 18;
+  const dist  = 16;
+  const handY = p.y + 12; // anchor at hand height, not over the head
   ctx.save();
-  ctx.translate(p.x + Math.cos(angle) * dist, p.y + Math.sin(angle) * dist);
+  ctx.translate(p.x + Math.cos(angle) * dist, handY + Math.sin(angle) * dist);
   ctx.rotate(angle + Math.PI / 2); // sprites point up
   ctx.drawImage(SHEET, sx, sy, sw, sh,
     -sw * SPRITE_SCALE / 2, -sh * SPRITE_SCALE / 2,
