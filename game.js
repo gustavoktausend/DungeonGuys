@@ -1,22 +1,65 @@
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TILE   = 32;
 const COIN_MAGNET   = 80;  // px radius auto-collect
+const SPRITE_SCALE  = 2;
+
+// ─── Spritesheet (0x72 DungeonTilesetII v1.7, CC0) ────────────────────────────
+const SHEET = new Image();
+SHEET.src = 'assets/dungeon_tileset.png';
+
+// frame list: [sx, sy, sw, sh] — stride lets frames sit on a wider grid
+function frames(x, y, w, h, n, stride = w) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push([x + i * stride, y, w, h]);
+  return out;
+}
+
+const ANIMS = {
+  wizzard:   { idle: frames(128, 164, 16, 28, 4), run: frames(192, 164, 16, 28, 4) },
+  elf:       { idle: frames(128,  36, 16, 28, 4), run: frames(192,  36, 16, 28, 4) },
+  knight:    { idle: frames(128, 100, 16, 28, 4), run: frames(192, 100, 16, 28, 4) },
+  skelet:    { idle: frames(368,  88, 16, 16, 4), run: frames(432,  88, 16, 16, 4) },
+  goblin:    { idle: frames(368,  40, 16, 16, 4), run: frames(432,  40, 16, 16, 4) },
+  chort:     { idle: frames(368, 273, 16, 23, 4), run: frames(432, 273, 16, 23, 4) },
+  big_demon: { idle: frames( 16, 428, 32, 36, 4), run: frames(144, 428, 32, 36, 4) },
+};
+const COIN_FRAMES = frames(289, 385, 6, 7, 4, 8);
+const WEAPON_SPRITES = {
+  staff: [324, 129,  8, 30],
+  bow:   [289, 195, 14, 26],
+  sword: [323,  10, 10, 21],
+  arrow: [324, 202,  7, 21],
+};
+
+let animTick = 0; // global 4-frame animation clock
+
+// draws a frame centered on (x, y), optionally mirrored horizontally
+function drawSprite(frame, x, y, flip) {
+  const [sx, sy, sw, sh] = frame;
+  const dw = sw * SPRITE_SCALE;
+  const dh = sh * SPRITE_SCALE;
+  ctx.save();
+  ctx.translate(x, y);
+  if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(SHEET, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
+  ctx.restore();
+}
 
 // ─── Classes (Brotato-style) ──────────────────────────────────────────────────
 const CLASS_DEFS = {
   mage: {
     hp: 100, speed: 2.6, fireRate: 220,
-    attack: 'bolt',
+    attack: 'bolt', anim: 'wizzard', weapon: 'staff',
     bulletSpeed: 7, range: 380, damage: [25, 35], pierce: 0,
   },
   archer: {
     hp: 80, speed: 3.0, fireRate: 380,
-    attack: 'arrow',
+    attack: 'arrow', anim: 'elf', weapon: 'bow',
     bulletSpeed: 11, range: 560, damage: [30, 42], pierce: 2,
   },
   warrior: {
     hp: 150, speed: 2.8, fireRate: 420,
-    attack: 'melee',
+    attack: 'melee', anim: 'knight', weapon: 'sword',
     range: 58, damage: [45, 62], arc: Math.PI * 0.65, knockback: 14,
   },
 };
@@ -85,6 +128,7 @@ window.addEventListener('load', () => {
 function resizeCanvas() {
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
+  ctx.imageSmoothingEnabled = false; // resizing resets context state
   buildTileMap();
 }
 
@@ -241,7 +285,8 @@ function updatePlayer(dt) {
   if (keys['KeyA'] || keys['ArrowLeft'])  dx -= 1;
   if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
 
-  if (dx !== 0 || dy !== 0) {
+  p.moving = (dx !== 0 || dy !== 0);
+  if (p.moving) {
     const len = Math.sqrt(dx*dx + dy*dy);
     dx /= len; dy /= len;
     p.walkTimer += dt;
@@ -375,10 +420,10 @@ function updateBullets(dt) {
 
 // Enemies
 const ENEMY_DEFS = {
-  skeleton: { hp: 50,  speed: 1.1, w: 18, h: 22, score: 10, gold: 1 },
-  goblin:   { hp: 35,  speed: 1.7, w: 14, h: 16, score: 15, gold: 2 },
-  demon:    { hp: 90,  speed: 0.9, w: 22, h: 24, score: 25, gold: 3 },
-  brute:    { hp: 200, speed: 0.6, w: 28, h: 30, score: 50, gold: 6 },
+  skeleton: { hp: 50,  speed: 1.1, w: 26, h: 26, score: 10, gold: 1, anim: 'skelet' },
+  goblin:   { hp: 35,  speed: 1.7, w: 24, h: 24, score: 15, gold: 2, anim: 'goblin' },
+  demon:    { hp: 90,  speed: 0.9, w: 26, h: 40, score: 25, gold: 3, anim: 'chort' },
+  brute:    { hp: 200, speed: 0.6, w: 52, h: 62, score: 50, gold: 6, anim: 'big_demon' },
 };
 
 function spawnEnemy(type) {
@@ -400,9 +445,8 @@ function spawnEnemy(type) {
     score: def.score,
     goldDrop: def.gold,
     type,
+    anim: def.anim,
     dead: false,
-    animFrame: 0,
-    animTimer: 0,
     hitFlash: 0,
   });
 }
@@ -412,9 +456,6 @@ function updateEnemies(dt) {
   for (const e of enemies) {
     if (e.dead) continue;
     if (e.hitFlash > 0) e.hitFlash -= dt;
-
-    e.animTimer += dt;
-    if (e.animTimer > 200) { e.animFrame = (e.animFrame + 1) % 4; e.animTimer = 0; }
 
     const dx = player.x - e.x;
     const dy = player.y - e.y;
@@ -557,6 +598,7 @@ function rectCircle(rx, ry, rw, rh, cx, cy, cr) {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
+  animTick = Math.floor(performance.now() / 140) % 4;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawTiles();
   drawTorches();
@@ -654,26 +696,13 @@ function drawTorches() {
 function drawBullets() {
   for (const b of bullets) {
     if (b.type === 'arrow') {
-      // wooden shaft + green-glow tip
+      const [sx, sy, sw, sh] = WEAPON_SPRITES.arrow;
       ctx.save();
       ctx.translate(b.x, b.y);
-      ctx.rotate(b.angle);
-      ctx.fillStyle = '#8B6914';
-      ctx.fillRect(-8, -1, 14, 2);
-      // fletching
-      ctx.fillStyle = '#2ecc71';
-      ctx.fillRect(-8, -3, 3, 6);
-      // tip
-      ctx.shadowColor = '#2ecc71';
-      ctx.shadowBlur  = 6;
-      ctx.fillStyle   = '#d4c9a8';
-      ctx.beginPath();
-      ctx.moveTo(6, -3);
-      ctx.lineTo(10, 0);
-      ctx.lineTo(6, 3);
-      ctx.closePath();
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      ctx.rotate(b.angle + Math.PI / 2); // sprite points up
+      ctx.drawImage(SHEET, sx, sy, sw, sh,
+        -sw * SPRITE_SCALE / 2, -sh * SPRITE_SCALE / 2,
+        sw * SPRITE_SCALE, sh * SPRITE_SCALE);
       ctx.restore();
     } else {
       // magic bolt
@@ -720,124 +749,25 @@ function drawMeleeSwings() {
 function drawEnemies() {
   for (const e of enemies) {
     if (e.dead) continue;
-    ctx.save();
-    ctx.translate(e.x, e.y);
 
-    if (e.hitFlash > 0) {
-      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(e.hitFlash * 0.05);
-    }
+    const frame = ANIMS[e.anim].run[animTick];
+    const flip  = player.x < e.x; // face the player
 
-    switch (e.type) {
-      case 'skeleton': drawSkeleton(ctx, e); break;
-      case 'goblin':   drawGoblin(ctx, e);   break;
-      case 'demon':    drawDemon(ctx, e);     break;
-      case 'brute':    drawBrute(ctx, e);     break;
-    }
-
-    ctx.globalAlpha = 1;
+    if (e.hitFlash > 0) ctx.filter = 'brightness(2.5) saturate(40%)';
+    drawSprite(frame, e.x, e.y, flip);
+    ctx.filter = 'none';
 
     // HP bar
     if (e.hp < e.maxHp) {
-      const bw  = e.w + 6;
-      const bx  = -bw / 2;
-      const by  = -e.h / 2 - 7;
+      const bw = e.w + 6;
+      const bx = e.x - bw / 2;
+      const by = e.y - e.h / 2 - 9;
       ctx.fillStyle = '#1a1a1a';
       ctx.fillRect(bx, by, bw, 4);
       ctx.fillStyle = e.hp / e.maxHp > 0.5 ? '#27ae60' : '#e74c3c';
       ctx.fillRect(bx, by, bw * (e.hp / e.maxHp), 4);
     }
-
-    ctx.restore();
   }
-}
-
-// pixel helpers
-function px(ctx, x, y, w, h, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, w, h);
-}
-
-function drawSkeleton(ctx, e) {
-  const bob = Math.sin(e.animFrame * Math.PI / 2) * 1;
-  // body
-  px(ctx, -4, -8 + bob, 8, 10, '#d4c9a8');
-  // head
-  px(ctx, -5, -18 + bob, 10, 10, '#e8dcc8');
-  // eyes (black sockets)
-  px(ctx, -4, -16 + bob, 3, 3, '#1a1a1a');
-  px(ctx,  1, -16 + bob, 3, 3, '#1a1a1a');
-  // ribcage lines
-  px(ctx, -3, -5 + bob, 6, 1, '#b8a888');
-  px(ctx, -3, -2 + bob, 6, 1, '#b8a888');
-  // legs
-  const leg = e.animFrame % 2 === 0 ? 1 : -1;
-  px(ctx, -4, 2 + bob, 3, 7 + leg, '#d4c9a8');
-  px(ctx,  1, 2 + bob, 3, 7 - leg, '#d4c9a8');
-}
-
-function drawGoblin(ctx, e) {
-  const bob = Math.sin(e.animFrame * Math.PI / 2) * 1;
-  // skin
-  px(ctx, -5, -6 + bob, 10, 8, '#27ae60');
-  px(ctx, -4, -14 + bob, 8, 8, '#2ecc71');
-  // eyes
-  px(ctx, -3, -12 + bob, 2, 2, '#e74c3c');
-  px(ctx,  1, -12 + bob, 2, 2, '#e74c3c');
-  // ears
-  px(ctx, -7, -13 + bob, 2, 4, '#27ae60');
-  px(ctx,  5, -13 + bob, 2, 4, '#27ae60');
-  // legs
-  const leg = e.animFrame % 2 === 0 ? 1 : -1;
-  px(ctx, -4, 2 + bob, 3, 5 + leg, '#1a6b3a');
-  px(ctx,  1, 2 + bob, 3, 5 - leg, '#1a6b3a');
-}
-
-function drawDemon(ctx, e) {
-  const bob = Math.sin(e.animFrame * Math.PI / 2) * 1;
-  // horns
-  px(ctx, -8, -22 + bob, 3, 6, '#6c1f8c');
-  px(ctx,  5, -22 + bob, 3, 6, '#6c1f8c');
-  // body
-  px(ctx, -7, -8 + bob, 14, 12, '#6c3483');
-  // head
-  px(ctx, -6, -20 + bob, 12, 12, '#9b59b6');
-  // eyes (glowing)
-  ctx.shadowColor = '#ff0000';
-  ctx.shadowBlur  = 6;
-  px(ctx, -4, -17 + bob, 3, 3, '#ff0000');
-  px(ctx,  1, -17 + bob, 3, 3, '#ff0000');
-  ctx.shadowBlur = 0;
-  // wings (just triangles approximated)
-  px(ctx, -12, -10 + bob, 5, 10, '#4a1060');
-  px(ctx,  7,  -10 + bob, 5, 10, '#4a1060');
-  // legs
-  const leg = e.animFrame % 2 === 0 ? 1 : -1;
-  px(ctx, -5, 4 + bob, 4, 8 + leg, '#6c3483');
-  px(ctx,  1, 4 + bob, 4, 8 - leg, '#6c3483');
-}
-
-function drawBrute(ctx, e) {
-  const bob = Math.sin(e.animFrame * Math.PI / 2) * 1;
-  // massive body
-  px(ctx, -11, -6 + bob, 22, 16, '#922b21');
-  // head
-  px(ctx, -9, -20 + bob, 18, 14, '#c0392b');
-  // horns
-  px(ctx, -10, -24 + bob, 4, 8, '#7b241c');
-  px(ctx,  6,  -24 + bob, 4, 8, '#7b241c');
-  // eyes
-  ctx.shadowColor = '#ff8c00';
-  ctx.shadowBlur  = 8;
-  px(ctx, -6, -17 + bob, 4, 4, '#ff8c00');
-  px(ctx,  2,  -17 + bob, 4, 4, '#ff8c00');
-  ctx.shadowBlur = 0;
-  // legs
-  const leg = e.animFrame % 2 === 0 ? 2 : -2;
-  px(ctx, -9, 10 + bob, 7, 10 + leg, '#7b241c');
-  px(ctx,  2,  10 + bob, 7, 10 - leg, '#7b241c');
-  // arms
-  px(ctx, -16, -4 + bob, 5, 12, '#922b21');
-  px(ctx,  11,  -4 + bob, 5, 12, '#922b21');
 }
 
 // Player
@@ -845,69 +775,12 @@ function drawPlayer() {
   const p = player;
   if (p.invincible > 0 && Math.floor(p.invincible / 80) % 2 === 0) return; // blink
 
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.rotate(p.facing + Math.PI / 2);
+  const animSet = ANIMS[p.def.anim];
+  const frame   = (p.moving ? animSet.run : animSet.idle)[animTick];
+  const flip    = Math.cos(p.facing) < 0; // face the aim direction
 
-  const bob = Math.sin(p.walkFrame * Math.PI / 2) * 1.5;
-
-  const OUTFITS = {
-    mage:    { body: '#1a3a5c', hood: '#162d47' },
-    archer:  { body: '#1a5c3a', hood: '#14472d' },
-    warrior: { body: '#5c2a1a', hood: '#472016' },
-  };
-  const outfit = OUTFITS[p.cls] || OUTFITS.mage;
-
-  // cloak / body
-  px(ctx, -6, -2 + bob, 12, 12, outfit.body);
-  // head
-  px(ctx, -5, -12 + bob, 10, 10, '#f0d0a0');
-  // hood
-  px(ctx, -6, -14 + bob, 12, 6, outfit.hood);
-  // eyes
-  px(ctx, -3, -10 + bob, 2, 2, '#ffffff');
-  px(ctx,  1,  -10 + bob, 2, 2, '#ffffff');
-
-  // weapon (right side, varies by class)
-  if (p.cls === 'archer') {
-    // bow: curved arc + string
-    ctx.strokeStyle = '#8B6914';
-    ctx.lineWidth   = 2;
-    ctx.beginPath();
-    ctx.arc(8, -4 + bob, 9, -Math.PI / 2.4, Math.PI / 2.4);
-    ctx.stroke();
-    ctx.strokeStyle = '#d4c9a8';
-    ctx.lineWidth   = 1;
-    ctx.beginPath();
-    ctx.moveTo(8 + Math.cos(-Math.PI / 2.4) * 9, -4 + bob + Math.sin(-Math.PI / 2.4) * 9);
-    ctx.lineTo(8 + Math.cos( Math.PI / 2.4) * 9, -4 + bob + Math.sin( Math.PI / 2.4) * 9);
-    ctx.stroke();
-  } else if (p.cls === 'warrior') {
-    // sword: blade + crossguard + grip
-    px(ctx, 7, -20 + bob, 3, 16, '#c8d6e5');
-    ctx.shadowColor = '#fff';
-    ctx.shadowBlur  = 6;
-    px(ctx, 7, -22 + bob, 3, 3, '#ffffff');
-    ctx.shadowBlur = 0;
-    px(ctx, 4, -5 + bob, 9, 2, '#8B6914');
-    px(ctx, 7, -3 + bob, 3, 6, '#5c3a14');
-  } else {
-    // staff with glowing gem
-    ctx.fillStyle = '#8B6914';
-    ctx.fillRect(7, -16 + bob, 2, 22);
-    ctx.shadowColor = '#4af';
-    ctx.shadowBlur  = 10;
-    ctx.fillStyle   = '#66ccff';
-    ctx.fillRect(6, -18 + bob, 4, 4);
-    ctx.shadowBlur = 0;
-  }
-
-  // legs
-  const legOff = p.walkFrame % 2 === 0 ? 2 : -2;
-  px(ctx, -5, 10 + bob, 4, 6 + legOff, outfit.hood);
-  px(ctx,  1,  10 + bob, 4, 6 - legOff, outfit.hood);
-
-  ctx.restore();
+  drawSprite(frame, p.x, p.y, flip);
+  drawHeldWeapon(p);
 
   // aim line (faint)
   ctx.strokeStyle = 'rgba(102,204,255,0.12)';
@@ -920,6 +793,27 @@ function drawPlayer() {
   ctx.setLineDash([]);
 }
 
+// held weapon, rotated toward the aim (sword follows the swing arc)
+function drawHeldWeapon(p) {
+  const [sx, sy, sw, sh] = WEAPON_SPRITES[p.def.weapon];
+  let angle = p.facing;
+
+  if (p.def.attack === 'melee' && meleeSwings.length > 0) {
+    const s = meleeSwings[meleeSwings.length - 1];
+    const progress = Math.min(1, (1 - s.life) * 2.2);
+    angle = s.angle - p.def.arc / 2 + p.def.arc * progress;
+  }
+
+  const dist = 18;
+  ctx.save();
+  ctx.translate(p.x + Math.cos(angle) * dist, p.y + Math.sin(angle) * dist);
+  ctx.rotate(angle + Math.PI / 2); // sprites point up
+  ctx.drawImage(SHEET, sx, sy, sw, sh,
+    -sw * SPRITE_SCALE / 2, -sh * SPRITE_SCALE / 2,
+    sw * SPRITE_SCALE, sh * SPRITE_SCALE);
+  ctx.restore();
+}
+
 // Coins
 function drawCoins() {
   for (const c of coins) {
@@ -927,10 +821,7 @@ function drawCoins() {
     const bobY = Math.sin(c.bob) * 2;
     ctx.shadowColor = '#ffd700';
     ctx.shadowBlur  = 6;
-    ctx.fillStyle   = '#f1c40f';
-    ctx.fillRect(c.x - 4, c.y - 4 + bobY, 8, 8);
-    ctx.fillStyle = '#f39c12';
-    ctx.fillRect(c.x - 2, c.y - 2 + bobY, 4, 4);
+    drawSprite(COIN_FRAMES[animTick], c.x, c.y + bobY, false);
     ctx.shadowBlur = 0;
   }
 }
