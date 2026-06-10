@@ -25,10 +25,26 @@ const ANIMS = {
 };
 const COIN_FRAMES = frames(289, 385, 6, 7, 4, 8);
 const WEAPON_SPRITES = {
-  staff: [324, 129,  8, 30],
-  bow:   [289, 195, 14, 26],
-  sword: [323,  10, 10, 21],
-  arrow: [324, 202,  7, 21],
+  staff:       [324, 129,  8, 30],
+  staff_green: [340, 129,  8, 30],
+  bow:         [289, 195, 14, 26],
+  bow_2:       [305, 195, 14, 26],
+  sword_rusty: [307,  10, 10, 21],
+  sword_knight:[339,  98, 10, 29],
+  sword_anime: [322,  65, 12, 30],
+  arrow:       [324, 202,  7, 21],
+};
+
+const FLOOR_TILES = [
+  [16, 64, 16, 16], [32, 64, 16, 16], [48, 64, 16, 16], [16, 80, 16, 16],
+  [32, 80, 16, 16], [48, 80, 16, 16], [16, 96, 16, 16], [32, 96, 16, 16],
+];
+const WALL_TILES = {
+  mid:     [32, 16, 16, 16],
+  top:     [32,  0, 16, 16],
+  banner_red:  [16, 32, 16, 16],
+  banner_blue: [32, 32, 16, 16],
+  hole:    [48, 32, 16, 16],
 };
 
 let animTick = 0; // global 4-frame animation clock
@@ -46,21 +62,34 @@ function drawSprite(frame, x, y, flip) {
 }
 
 // ─── Classes (Brotato-style) ──────────────────────────────────────────────────
+// Each class has 3 weapon tiers; an upgrade pickup drops every 2 waves.
 const CLASS_DEFS = {
   mage: {
-    hp: 100, speed: 2.6, fireRate: 220,
-    attack: 'bolt', anim: 'wizzard', weapon: 'staff',
-    bulletSpeed: 7, range: 380, damage: [25, 35], pierce: 0,
+    hp: 100, speed: 2.6, anim: 'wizzard',
+    special: 'fireball', specialCd: 8000,
+    tiers: [
+      { name: 'APPRENTICE STAFF', sprite: 'staff',       attack: 'bolt', fireRate: 220, bulletSpeed: 7, range: 380, damage: [25, 35], pierce: 0, count: 1 },
+      { name: 'EMERALD STAFF',    sprite: 'staff_green', attack: 'bolt', fireRate: 185, bulletSpeed: 8, range: 430, damage: [36, 48], pierce: 1, count: 1 },
+      { name: 'ARCANE STAFF',     sprite: 'staff_green', attack: 'bolt', fireRate: 150, bulletSpeed: 9, range: 480, damage: [48, 64], pierce: 2, count: 1 },
+    ],
   },
   archer: {
-    hp: 80, speed: 3.0, fireRate: 380,
-    attack: 'arrow', anim: 'elf', weapon: 'bow',
-    bulletSpeed: 11, range: 560, damage: [30, 42], pierce: 2,
+    hp: 80, speed: 3.0, anim: 'elf',
+    special: 'volley', specialCd: 7000,
+    tiers: [
+      { name: 'SHORT BOW', sprite: 'bow',   attack: 'arrow', fireRate: 380, bulletSpeed: 11, range: 560, damage: [30, 42], pierce: 2, count: 1 },
+      { name: 'ELVEN BOW', sprite: 'bow_2', attack: 'arrow', fireRate: 350, bulletSpeed: 12, range: 600, damage: [34, 46], pierce: 2, count: 2 },
+      { name: 'TWIN BOW',  sprite: 'bow_2', attack: 'arrow', fireRate: 320, bulletSpeed: 13, range: 640, damage: [38, 52], pierce: 3, count: 3 },
+    ],
   },
   warrior: {
-    hp: 150, speed: 2.8, fireRate: 420,
-    attack: 'melee', anim: 'knight', weapon: 'sword',
-    range: 58, damage: [45, 62], arc: Math.PI * 0.65, knockback: 14,
+    hp: 150, speed: 2.8, anim: 'knight',
+    special: 'whirlwind', specialCd: 6000,
+    tiers: [
+      { name: 'RUSTY SWORD',  sprite: 'sword_rusty',  attack: 'melee', fireRate: 420, range: 58, damage: [45, 62],  arc: Math.PI * 0.65, knockback: 14 },
+      { name: 'KNIGHT SWORD', sprite: 'sword_knight', attack: 'melee', fireRate: 380, range: 70, damage: [60, 80],  arc: Math.PI * 0.75, knockback: 17 },
+      { name: 'ANIME BLADE',  sprite: 'sword_anime',  attack: 'melee', fireRate: 330, range: 84, damage: [80, 105], arc: Math.PI * 0.88, knockback: 22 },
+    ],
   },
 };
 let selectedClass = 'mage';
@@ -71,7 +100,7 @@ let gameState = 'start'; // start | playing | paused | gameover
 let lastTime   = 0;
 let animId     = null;
 
-let player, bullets, enemies, coins, particles, meleeSwings;
+let player, bullets, enemies, coins, particles, meleeSwings, upgrades;
 let score, gold, wave, waveTimer, waveActive;
 let nextWaveDelay = 3000;
 let spawnQueue   = [];
@@ -90,6 +119,7 @@ const screens = {
 };
 const hud          = document.getElementById('hud');
 const hpBar        = document.getElementById('hp-bar');
+const spBar        = document.getElementById('sp-bar');
 const waveDisplay  = document.getElementById('wave-display');
 const scoreDisplay = document.getElementById('score-display');
 const goldDisplay  = document.getElementById('gold-display');
@@ -120,8 +150,12 @@ window.addEventListener('load', () => {
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup',   e => { keys[e.code] = false; });
   canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
-  canvas.addEventListener('mousedown', e => { if (e.button === 0) { mouseDown = true; attack(); } });
+  canvas.addEventListener('mousedown', e => {
+    if (e.button === 0) { mouseDown = true; attack(); }
+    if (e.button === 2) castSpecial();
+  });
   window.addEventListener('mouseup',   e => { if (e.button === 0) mouseDown = false; });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
   showScreen('start');
 });
 
@@ -134,6 +168,7 @@ function resizeCanvas() {
 
 function onKeyDown(e) {
   keys[e.code] = true;
+  if (e.code === 'KeyE') castSpecial();
   if (e.code === 'Escape') {
     if (gameState === 'playing') pauseGame();
     else if (gameState === 'paused') resumeGame();
@@ -149,6 +184,8 @@ function showScreen(name) {
 function hideAllScreens() { showScreen(null); }
 
 // ─── Tile Map ─────────────────────────────────────────────────────────────────
+let floorCanvas = null;
+
 function buildTileMap() {
   mapCols = Math.ceil(canvas.width  / TILE) + 2;
   mapRows = Math.ceil(canvas.height / TILE) + 2;
@@ -161,6 +198,54 @@ function buildTileMap() {
       tileMap[r][c] = { wall: edge, variant: Math.random() };
     }
   }
+  renderFloorCanvas();
+}
+
+// pre-renders the whole tilemap once; drawTiles() then blits a single image
+function renderFloorCanvas() {
+  if (!SHEET.complete || SHEET.naturalWidth === 0) return; // retried on SHEET load
+  floorCanvas = document.createElement('canvas');
+  floorCanvas.width  = canvas.width;
+  floorCanvas.height = canvas.height;
+  const f = floorCanvas.getContext('2d');
+  f.imageSmoothingEnabled = false;
+
+  const blit = ([sx, sy, sw, sh], x, y) =>
+    f.drawImage(SHEET, sx, sy, sw, sh, x, y, TILE, TILE);
+
+  for (let r = 0; r < mapRows; r++) {
+    for (let c = 0; c < mapCols; c++) {
+      const t = tileMap[r][c];
+      const x = (c - 1) * TILE;
+      const y = (r - 1) * TILE;
+
+      if (!t.wall) {
+        // mostly plain floor; light variants only, heavy cracks are too noisy
+        const tile = t.variant < 0.88
+          ? FLOOR_TILES[0]
+          : FLOOR_TILES[1 + Math.floor(t.variant * 31) % 5];
+        blit(tile, x, y);
+        continue;
+      }
+
+      if (r === 0) {
+        // top wall face, with the occasional banner or crumbled hole
+        const deco = t.variant < 0.06 ? WALL_TILES.banner_red
+                   : t.variant < 0.12 ? WALL_TILES.banner_blue
+                   : t.variant < 0.18 ? WALL_TILES.hole
+                   : WALL_TILES.mid;
+        blit(WALL_TILES.mid, x, y);
+        blit(deco, x, y);
+      } else {
+        // side/bottom walls read as a stone cap seen from above
+        blit(WALL_TILES.top, x, y);
+      }
+    }
+  }
+
+  // darken the floor slightly so torch glow stands out
+  f.fillStyle = 'rgba(0,0,10,0.25)';
+  f.fillRect(0, 0, floorCanvas.width, floorCanvas.height);
 }
 
 // ─── Game start/stop ──────────────────────────────────────────────────────────
@@ -176,6 +261,7 @@ function startGame() {
   coins       = [];
   particles   = [];
   meleeSwings = [];
+  upgrades    = [];
 
   const cls = CLASS_DEFS[selectedClass];
   player = {
@@ -186,6 +272,9 @@ function startGame() {
     speed: cls.speed,
     cls: selectedClass,
     def: cls,
+    tier: 0,
+    weapon: cls.tiers[0],
+    specialTimer: 0,
     invincible: 0,
     facing: 0,
     walkFrame: 0,
@@ -267,6 +356,7 @@ function update(dt) {
   updateBullets(dt);
   updateMeleeSwings(dt);
   updateEnemies(dt);
+  updateUpgrades(dt);
   updateCoins(dt);
   updateParticles(dt);
   updateSpawnQueue(dt);
@@ -278,6 +368,7 @@ function update(dt) {
 function updatePlayer(dt) {
   const p = player;
   if (p.invincible > 0) p.invincible -= dt;
+  if (p.specialTimer > 0) p.specialTimer -= dt;
 
   let dx = 0, dy = 0;
   if (keys['KeyW'] || keys['ArrowUp'])    dy -= 1;
@@ -310,41 +401,50 @@ function updatePlayer(dt) {
 
 function attack() {
   if (gameState !== 'playing') return;
-  const def = player.def;
+  const w = player.weapon;
   const now = performance.now();
-  if (now - lastShot < def.fireRate) return;
+  if (now - lastShot < w.fireRate) return;
   lastShot = now;
 
   const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-  if (def.attack === 'melee') {
-    meleeAttack(angle);
+  if (w.attack === 'melee') {
+    meleeAttack(angle, w);
   } else {
-    const spread = (Math.random() - 0.5) * 0.04;
-    bullets.push({
-      x: player.x,
-      y: player.y,
-      vx: Math.cos(angle + spread) * def.bulletSpeed,
-      vy: Math.sin(angle + spread) * def.bulletSpeed,
-      angle: angle + spread,
-      speed: def.bulletSpeed,
-      range: def.range,
-      damage: def.damage,
-      pierce: def.pierce,
-      type: def.attack, // 'bolt' | 'arrow'
-      hitIds: new Set(),
-      dist: 0,
-      dead: false,
-    });
+    // multi-shot weapons fan out around the aim
+    const count = w.count || 1;
+    for (let i = 0; i < count; i++) {
+      const fan = count > 1 ? (i - (count - 1) / 2) * 0.14 : 0;
+      fireProjectile(angle + fan, w.attack, w);
+    }
   }
 }
 
+function fireProjectile(angle, type, w) {
+  const spread = (Math.random() - 0.5) * 0.04;
+  bullets.push({
+    x: player.x,
+    y: player.y,
+    vx: Math.cos(angle + spread) * w.bulletSpeed,
+    vy: Math.sin(angle + spread) * w.bulletSpeed,
+    angle: angle + spread,
+    speed: w.bulletSpeed,
+    range: w.range,
+    damage: w.damage,
+    pierce: w.pierce || 0,
+    aoe: w.aoe || 0,
+    type, // 'bolt' | 'arrow' | 'fireball'
+    hitIds: new Set(),
+    dist: 0,
+    dead: false,
+  });
+}
+
 // ─── Melee ────────────────────────────────────────────────────────────────────
-function meleeAttack(angle) {
-  const def = player.def;
-  meleeSwings.push({ angle, life: 1 });
+function meleeAttack(angle, w) {
+  meleeSwings.push({ angle, life: 1, range: w.range, arc: w.arc });
   spawnParticles(
-    player.x + Math.cos(angle) * def.range * 0.6,
-    player.y + Math.sin(angle) * def.range * 0.6,
+    player.x + Math.cos(angle) * w.range * 0.6,
+    player.y + Math.sin(angle) * w.range * 0.6,
     '#ffe066', 4
   );
 
@@ -353,22 +453,72 @@ function meleeAttack(angle) {
     const dx = e.x - player.x;
     const dy = e.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > def.range + Math.max(e.w, e.h) / 2) continue;
+    if (dist > w.range + Math.max(e.w, e.h) / 2) continue;
 
     let diff = Math.atan2(dy, dx) - angle;
     while (diff >  Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    if (Math.abs(diff) > def.arc / 2) continue;
+    if (Math.abs(diff) > w.arc / 2) continue;
 
-    e.hp -= rollDamage(def.damage);
+    e.hp -= rollDamage(w.damage);
     e.hitFlash = 150;
     // knockback away from player
     if (dist > 1) {
-      e.x += (dx / dist) * def.knockback;
-      e.y += (dy / dist) * def.knockback;
+      e.x += (dx / dist) * w.knockback;
+      e.y += (dy / dist) * w.knockback;
     }
     spawnParticles(e.x, e.y, '#ff4444', 6);
     if (e.hp <= 0) killEnemy(e);
+  }
+}
+
+// ─── Special abilities (right-click / E) ──────────────────────────────────────
+function castSpecial() {
+  if (gameState !== 'playing' || player.specialTimer > 0) return;
+  player.specialTimer = player.def.specialCd;
+
+  const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+  const w = player.weapon;
+
+  switch (player.def.special) {
+    case 'fireball':
+      fireProjectile(angle, 'fireball', {
+        bulletSpeed: 5.5, range: 520,
+        damage: [80, 120], pierce: 0, aoe: 95,
+      });
+      break;
+
+    case 'volley': {
+      // ring of arrows in all directions
+      const n = 12;
+      for (let i = 0; i < n; i++) {
+        fireProjectile(angle + (i / n) * Math.PI * 2, 'arrow', w);
+      }
+      break;
+    }
+
+    case 'whirlwind':
+      meleeAttack(angle, {
+        range: w.range + 14,
+        arc: Math.PI * 2,
+        damage: [w.damage[0] * 1.5 | 0, w.damage[1] * 1.5 | 0],
+        knockback: w.knockback * 2,
+      });
+      break;
+  }
+}
+
+function explode(b) {
+  spawnParticles(b.x, b.y, '#ff8c00', 24);
+  spawnParticles(b.x, b.y, '#ffe066', 16);
+  for (const e of enemies) {
+    if (e.dead) continue;
+    const dx = e.x - b.x, dy = e.y - b.y;
+    if (Math.sqrt(dx * dx + dy * dy) <= b.aoe + Math.max(e.w, e.h) / 2) {
+      e.hp -= rollDamage(b.damage);
+      e.hitFlash = 150;
+      if (e.hp <= 0) killEnemy(e);
+    }
   }
 }
 
@@ -394,13 +544,19 @@ function updateBullets(dt) {
         b.x < 0 || b.x > canvas.width ||
         b.y < 0 || b.y > canvas.height) {
       b.dead = true;
-      spawnParticles(b.x, b.y, '#ff8c00', 3);
+      if (b.type === 'fireball') explode(b);
+      else spawnParticles(b.x, b.y, '#ff8c00', 3);
       continue;
     }
 
     for (const e of enemies) {
       if (e.dead || b.hitIds.has(e)) continue;
-      if (rectCircle(e.x, e.y, e.w, e.h, b.x, b.y, 5)) {
+      if (rectCircle(e.x, e.y, e.w, e.h, b.x, b.y, b.type === 'fireball' ? 9 : 5)) {
+        if (b.type === 'fireball') {
+          b.dead = true;
+          explode(b);
+          break;
+        }
         e.hp -= rollDamage(b.damage);
         e.hitFlash = 150;
         b.hitIds.add(e);
@@ -571,8 +727,40 @@ function checkWaveComplete() {
   if (allSpawned && enemies.length === 0) {
     waveActive = false;
     announceWave(`WAVE ${wave} CLEAR!`);
+    // weapon upgrade drop every 2 waves until max tier
+    if (wave % 2 === 0 && player.tier < player.def.tiers.length - 1) {
+      spawnUpgrade();
+    }
     setTimeout(startNextWave, nextWaveDelay);
   }
+}
+
+// ─── Weapon upgrades ──────────────────────────────────────────────────────────
+function spawnUpgrade() {
+  const margin = 120;
+  upgrades.push({
+    x: margin + Math.random() * (canvas.width  - margin * 2),
+    y: margin + Math.random() * (canvas.height - margin * 2),
+    bob: 0,
+    dead: false,
+  });
+}
+
+function updateUpgrades(dt) {
+  for (const u of upgrades) {
+    if (u.dead) continue;
+    u.bob += dt * 0.004;
+    const dx = player.x - u.x;
+    const dy = player.y - u.y;
+    if (Math.sqrt(dx * dx + dy * dy) < 24) {
+      u.dead = true;
+      player.tier++;
+      player.weapon = player.def.tiers[player.tier];
+      announceWave(player.weapon.name + '!');
+      spawnParticles(u.x, u.y, '#ffd700', 16);
+    }
+  }
+  upgrades = upgrades.filter(u => !u.dead);
 }
 
 // HUD
@@ -586,6 +774,10 @@ function updateHUD() {
     : `linear-gradient(to right, #c0392b, #e74c3c)`;
   scoreDisplay.textContent = score;
   goldDisplay.textContent  = gold;
+
+  const spPct = Math.max(0, 1 - player.specialTimer / player.def.specialCd) * 100;
+  spBar.style.width = spPct + '%';
+  spBar.classList.toggle('ready', spPct >= 100);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -603,6 +795,7 @@ function render() {
   drawTiles();
   drawTorches();
   drawCoins();
+  drawUpgrades();
   drawBullets();
   drawMeleeSwings();
   drawEnemies();
@@ -612,51 +805,15 @@ function render() {
 
 // Tiles
 function drawTiles() {
-  for (let r = 0; r < mapRows; r++) {
-    for (let c = 0; c < mapCols; c++) {
-      const t = tileMap[r][c];
-      const x = (c - 1) * TILE;
-      const y = (r - 1) * TILE;
-
-      if (t.wall) {
-        ctx.fillStyle = t.variant > 0.85 ? '#141420' : '#1a1a28';
-        ctx.fillRect(x, y, TILE, TILE);
-        // brick lines
-        ctx.strokeStyle = '#0e0e1a';
-        ctx.lineWidth   = 1;
-        ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
-      } else {
-        const shade = 0x14 + Math.floor(t.variant * 0x0a);
-        ctx.fillStyle = `rgb(${shade},${shade},${shade + 0x10})`;
-        ctx.fillRect(x, y, TILE, TILE);
-
-        // grout lines
-        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-        ctx.lineWidth   = 1;
-        if ((r + c) % 2 === 0) {
-          ctx.beginPath();
-          ctx.moveTo(x, y + TILE / 2);
-          ctx.lineTo(x + TILE, y + TILE / 2);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(x + TILE / 2, y);
-          ctx.lineTo(x + TILE / 2, y + TILE);
-          ctx.stroke();
-        } else {
-          ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
-        }
-
-        // random cracks / imperfections
-        if (t.variant < 0.08) {
-          ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-          ctx.beginPath();
-          ctx.moveTo(x + 4, y + 4);
-          ctx.lineTo(x + 10, y + 14);
-          ctx.stroke();
-        }
-      }
+  if (!floorCanvas) {
+    renderFloorCanvas(); // sheet may have finished loading after resize
+    if (!floorCanvas) {  // still loading: plain dark floor
+      ctx.fillStyle = '#1a1a24';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      return;
     }
   }
+  ctx.drawImage(floorCanvas, 0, 0);
 }
 
 // Torches (glow spots at room edges)
@@ -704,6 +861,21 @@ function drawBullets() {
         -sw * SPRITE_SCALE / 2, -sh * SPRITE_SCALE / 2,
         sw * SPRITE_SCALE, sh * SPRITE_SCALE);
       ctx.restore();
+    } else if (b.type === 'fireball') {
+      const pulse = 1 + Math.sin(performance.now() / 60) * 0.15;
+      ctx.shadowColor = '#ff4500';
+      ctx.shadowBlur  = 20;
+      ctx.fillStyle   = '#ff6600';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 9 * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffe066';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 5 * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // fire trail
+      spawnParticles(b.x, b.y, Math.random() < 0.5 ? '#ff8c00' : '#ff4500', 1);
     } else {
       // magic bolt
       ctx.shadowColor = '#ff8c00';
@@ -719,13 +891,11 @@ function drawBullets() {
 
 // Melee swing arcs
 function drawMeleeSwings() {
-  const def = CLASS_DEFS.warrior;
   for (const s of meleeSwings) {
     const progress = 1 - s.life; // 0 → 1
-    const sweep    = def.arc;
     // arc sweeps from one edge to the other as life decays
-    const start = s.angle - sweep / 2;
-    const end   = start + sweep * Math.min(1, progress * 2.2);
+    const start = s.angle - s.arc / 2;
+    const end   = start + s.arc * Math.min(1, progress * 2.2);
 
     ctx.save();
     ctx.globalAlpha = s.life * 0.85;
@@ -734,14 +904,32 @@ function drawMeleeSwings() {
     ctx.shadowBlur  = 12;
     ctx.lineWidth   = 5;
     ctx.beginPath();
-    ctx.arc(player.x, player.y, def.range - 6, start, end);
+    ctx.arc(player.x, player.y, s.range - 6, start, end);
     ctx.stroke();
     ctx.lineWidth   = 2;
     ctx.strokeStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(player.x, player.y, def.range - 12, start, end);
+    ctx.arc(player.x, player.y, s.range - 12, start, end);
     ctx.stroke();
     ctx.restore();
+  }
+}
+
+// Weapon upgrade pickups (shows the next-tier weapon floating)
+function drawUpgrades() {
+  for (const u of upgrades) {
+    if (u.dead) continue;
+    const nextTier = player.def.tiers[Math.min(player.tier + 1, player.def.tiers.length - 1)];
+    const bobY = Math.sin(u.bob) * 4;
+
+    // glow halo
+    const g = ctx.createRadialGradient(u.x, u.y + bobY, 0, u.x, u.y + bobY, 28);
+    g.addColorStop(0, 'rgba(255,215,0,0.35)');
+    g.addColorStop(1, 'rgba(255,215,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(u.x - 28, u.y + bobY - 28, 56, 56);
+
+    drawSprite(WEAPON_SPRITES[nextTier.sprite], u.x, u.y + bobY, false);
   }
 }
 
@@ -795,13 +983,13 @@ function drawPlayer() {
 
 // held weapon, rotated toward the aim (sword follows the swing arc)
 function drawHeldWeapon(p) {
-  const [sx, sy, sw, sh] = WEAPON_SPRITES[p.def.weapon];
+  const [sx, sy, sw, sh] = WEAPON_SPRITES[p.weapon.sprite];
   let angle = p.facing;
 
-  if (p.def.attack === 'melee' && meleeSwings.length > 0) {
+  if (p.weapon.attack === 'melee' && meleeSwings.length > 0) {
     const s = meleeSwings[meleeSwings.length - 1];
     const progress = Math.min(1, (1 - s.life) * 2.2);
-    angle = s.angle - p.def.arc / 2 + p.def.arc * progress;
+    angle = s.angle - s.arc / 2 + s.arc * progress;
   }
 
   const dist = 18;
