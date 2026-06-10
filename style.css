@@ -282,6 +282,74 @@ html, body {
   text-shadow: 0 0 16px var(--torch-orange);
 }
 
+/* ─── Shop Screen ──────────────────────────────────────── */
+.shop-inner { min-width: min(440px, 90vw); }
+
+.shop-title {
+  font-size: clamp(11px, 2.5vw, 18px);
+  color: var(--torch-yellow);
+  letter-spacing: 0.25em;
+  text-shadow: 0 0 14px rgba(255,215,0,0.5);
+}
+
+.shop-gold {
+  font-size: clamp(7px, 1.5vw, 11px);
+  color: rgba(232,220,200,0.6);
+  letter-spacing: 0.15em;
+}
+.shop-gold span {
+  color: var(--gold-coin);
+  text-shadow: 0 0 8px rgba(241,196,15,0.6);
+}
+
+.shop-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.shop-item {
+  font-family: var(--pixel-font);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 13px 10px;
+  background: var(--stone-dark);
+  border: 2px solid var(--ui-border);
+  color: var(--bone-white);
+  cursor: pointer;
+  transition: transform 0.08s, border-color 0.15s;
+}
+
+.shop-item:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--torch-yellow);
+}
+
+.shop-item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.shop-icon { font-size: clamp(13px, 2.5vw, 20px); line-height: 1; }
+.heal-icon  { color: #2ecc71; }
+.maxhp-icon { color: #e74c3c; }
+.dmg-icon   { color: #e67e22; }
+.spd-icon   { color: #3498db; }
+
+.shop-name {
+  font-size: clamp(5px, 1.1vw, 8px);
+  letter-spacing: 0.08em;
+}
+
+.shop-price {
+  font-size: clamp(6px, 1.3vw, 10px);
+  color: var(--gold-coin);
+}
+.shop-price::after { content: ' G'; opacity: 0.6; }
+
 /* ─── Game Over Screen ─────────────────────────────────── */
 .gameover-title {
   font-size: clamp(14px, 4vw, 36px);

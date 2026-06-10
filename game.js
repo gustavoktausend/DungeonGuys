@@ -23,6 +23,14 @@ const ANIMS = {
   chort:     { idle: frames(368, 273, 16, 23, 4), run: frames(432, 273, 16, 23, 4) },
   big_demon: { idle: frames( 16, 428, 32, 36, 4), run: frames(144, 428, 32, 36, 4) },
 };
+// mimic only has a 3-frame "open" anim; ping-pong it to fit the 4-frame clock
+const MIMIC_F = frames(304, 432, 16, 16, 3);
+ANIMS.mimic = { idle: [MIMIC_F[0], MIMIC_F[1], MIMIC_F[2], MIMIC_F[1]],
+                run:  [MIMIC_F[0], MIMIC_F[1], MIMIC_F[2], MIMIC_F[1]] };
+
+const FLASK_RED    = [288, 352, 16, 16];
+const CHEST_FRAMES = frames(304, 416, 16, 16, 3); // closed → opening → open
+const CHEST_EMPTY  = [336, 400, 16, 16];          // looted chest left behind
 const COIN_FRAMES = frames(289, 385, 6, 7, 4, 8);
 const WEAPON_SPRITES = {
   staff:       [324, 129,  8, 30],
@@ -112,6 +120,21 @@ let lastTime   = 0;
 let animId     = null;
 
 let player, bullets, enemies, coins, particles, meleeSwings, upgrades;
+let potions, chests, floatTexts;
+
+// ─── Shop (between waves) ─────────────────────────────────────────────────────
+const SHOP_ITEMS = {
+  heal:   { base: 10, scale: 1,    apply: () => { player.hp = Math.min(player.maxHp, player.hp + 30); } },
+  maxhp:  { base: 25, scale: 1.35, apply: () => { player.maxHp += 20; player.hp += 20; } },
+  damage: { base: 30, scale: 1.35, apply: () => { player.dmgMult *= 1.10; } },
+  speed:  { base: 25, scale: 1.35, apply: () => { player.speed *= 1.08; } },
+};
+let shopBought = {};
+
+function shopPrice(key) {
+  const it = SHOP_ITEMS[key];
+  return Math.round(it.base * Math.pow(it.scale, shopBought[key] || 0));
+}
 let score, gold, wave, waveTimer, waveActive;
 let nextWaveDelay = 3000;
 let spawnQueue   = [];
@@ -126,6 +149,7 @@ let mapCols, mapRows;
 const screens = {
   start:    document.getElementById('start-screen'),
   pause:    document.getElementById('pause-screen'),
+  shop:     document.getElementById('shop-screen'),
   gameover: document.getElementById('gameover-screen'),
 };
 const hud          = document.getElementById('hud');
@@ -143,6 +167,11 @@ document.getElementById('btn-start').addEventListener('click',   startGame);
 document.getElementById('btn-resume').addEventListener('click',  resumeGame);
 document.getElementById('btn-quit').addEventListener('click',    quitGame);
 document.getElementById('btn-restart').addEventListener('click', startGame);
+
+document.getElementById('btn-next-wave').addEventListener('click', closeShop);
+document.querySelectorAll('.shop-item').forEach(btn => {
+  btn.addEventListener('click', () => buyShopItem(btn.dataset.item));
+});
 
 document.querySelectorAll('.class-card').forEach(card => {
   card.addEventListener('click', () => {
@@ -294,6 +323,10 @@ function startGame() {
   particles   = [];
   meleeSwings = [];
   upgrades    = [];
+  potions     = [];
+  chests      = [];
+  floatTexts  = [];
+  shopBought  = {};
 
   const cls = CLASS_DEFS[selectedClass];
   player = {
@@ -307,6 +340,7 @@ function startGame() {
     tier: 0,
     weapon: cls.tiers[0],
     specialTimer: 0,
+    dmgMult: 1,
     invincible: 0,
     facing: 0,
     walkFrame: 0,
@@ -352,6 +386,17 @@ function startNextWave() {
   }
   waveDisplay.textContent = wave;
   announceWave(`— WAVE ${wave} —`);
+
+  // a chest may appear somewhere in the arena (might be a mimic...)
+  if (wave >= 2 && Math.random() < 0.6) {
+    const m = 90;
+    chests.push({
+      x: PLAY.left + m + Math.random() * (PLAY.right  - PLAY.left - m * 2),
+      y: PLAY.top  + m + Math.random() * (PLAY.bottom - PLAY.top  - m * 2),
+      state: 'closed', // closed → opening → looted
+      timer: 0,
+    });
+  }
 }
 
 function pickEnemyType(w) {
@@ -390,8 +435,11 @@ function update(dt) {
   updateMeleeSwings(dt);
   updateEnemies(dt);
   updateUpgrades(dt);
+  updatePotions(dt);
+  updateChests(dt);
   updateCoins(dt);
   updateParticles(dt);
+  updateFloatTexts(dt);
   updateSpawnQueue(dt);
   checkWaveComplete();
   updateHUD();
@@ -561,7 +609,8 @@ function updateMeleeSwings(dt) {
 }
 
 function rollDamage([min, max]) {
-  return min + Math.floor(Math.random() * (max - min + 1));
+  const dmg = min + Math.floor(Math.random() * (max - min + 1));
+  return Math.round(dmg * player.dmgMult);
 }
 
 // Bullets
@@ -609,10 +658,11 @@ function updateBullets(dt) {
 
 // Enemies
 const ENEMY_DEFS = {
-  skeleton: { hp: 50,  speed: 1.1, w: 26, h: 26, score: 10, gold: 1, anim: 'skelet' },
-  goblin:   { hp: 35,  speed: 1.7, w: 24, h: 24, score: 15, gold: 2, anim: 'goblin' },
-  demon:    { hp: 90,  speed: 0.9, w: 26, h: 40, score: 25, gold: 3, anim: 'chort' },
-  brute:    { hp: 200, speed: 0.6, w: 52, h: 62, score: 50, gold: 6, anim: 'big_demon' },
+  skeleton: { hp: 50,  speed: 1.1, w: 26, h: 26, score: 10, gold: 1, anim: 'skelet',    potion: 0.03 },
+  goblin:   { hp: 35,  speed: 1.7, w: 24, h: 24, score: 15, gold: 2, anim: 'goblin',    potion: 0.03 },
+  demon:    { hp: 90,  speed: 0.9, w: 26, h: 40, score: 25, gold: 3, anim: 'chort',     potion: 0.08 },
+  brute:    { hp: 200, speed: 0.6, w: 52, h: 62, score: 50, gold: 6, anim: 'big_demon', potion: 0.25 },
+  mimic:    { hp: 130, speed: 1.5, w: 26, h: 24, score: 40, gold: 8, anim: 'mimic',     potion: 0.5  },
 };
 
 function spawnEnemy(type) {
@@ -637,6 +687,7 @@ function spawnEnemy(type) {
     speed: def.speed + wave * 0.04,
     score: def.score,
     goldDrop: def.gold,
+    potionChance: def.potion,
     type,
     anim: def.anim,
     dead: false,
@@ -684,6 +735,9 @@ function killEnemy(e) {
       dead: false,
       bob: Math.random() * Math.PI * 2,
     });
+  }
+  if (Math.random() < e.potionChance) {
+    potions.push({ x: e.x, y: e.y, bob: Math.random() * Math.PI * 2, dead: false });
   }
 }
 
@@ -768,8 +822,142 @@ function checkWaveComplete() {
     if (wave % 2 === 0 && player.tier < player.def.tiers.length - 1) {
       spawnUpgrade();
     }
-    setTimeout(startNextWave, nextWaveDelay);
+    setTimeout(openShop, 1500);
   }
+}
+
+// ─── Shop flow ────────────────────────────────────────────────────────────────
+function openShop() {
+  if (gameState !== 'playing') return;
+  gameState = 'shop';
+  refreshShop();
+  showScreen('shop');
+}
+
+function closeShop() {
+  hideAllScreens();
+  gameState = 'playing';
+  lastTime  = performance.now();
+  startNextWave();
+  animId = requestAnimationFrame(loop);
+}
+
+function refreshShop() {
+  document.getElementById('shop-gold').textContent = gold;
+  for (const key of Object.keys(SHOP_ITEMS)) {
+    const price = shopPrice(key);
+    document.getElementById('price-' + key).textContent = price;
+    const btn = document.querySelector(`.shop-item[data-item="${key}"]`);
+    const healFull = key === 'heal' && player.hp >= player.maxHp;
+    btn.disabled = gold < price || healFull;
+  }
+}
+
+function buyShopItem(key) {
+  const price = shopPrice(key);
+  if (gold < price) return;
+  gold -= price;
+  shopBought[key] = (shopBought[key] || 0) + 1;
+  SHOP_ITEMS[key].apply();
+  updateHUD();
+  refreshShop();
+}
+
+// ─── Potions (auto-used on touch) ─────────────────────────────────────────────
+function updatePotions(dt) {
+  for (const pt of potions) {
+    if (pt.dead) continue;
+    pt.bob += dt * 0.004;
+    const dx = player.x - pt.x;
+    const dy = player.y - pt.y;
+    // only picked up when hurt — no waste
+    if (player.hp < player.maxHp && Math.sqrt(dx * dx + dy * dy) < 20) {
+      pt.dead = true;
+      const heal = Math.min(25, player.maxHp - player.hp);
+      player.hp += heal;
+      spawnParticles(player.x, player.y, '#2ecc71', 10);
+      addFloatText(player.x, player.y - 24, `+${heal} HP`, '#2ecc71');
+    }
+  }
+  potions = potions.filter(pt => !pt.dead);
+}
+
+// ─── Chests ───────────────────────────────────────────────────────────────────
+function updateChests(dt) {
+  for (const ch of chests) {
+    if (ch.state === 'looted') continue;
+
+    if (ch.state === 'opening') {
+      ch.timer += dt;
+      if (ch.timer >= 350) lootChest(ch);
+      continue;
+    }
+
+    const dx = player.x - ch.x;
+    const dy = player.y - ch.y;
+    if (Math.sqrt(dx * dx + dy * dy) < 26) {
+      ch.state = 'opening';
+      ch.timer = 0;
+    }
+  }
+}
+
+function lootChest(ch) {
+  ch.state = 'looted';
+  const roll = Math.random();
+
+  if (roll < 0.15) {
+    // mimic! it was never a chest at all
+    ch.dead = true;
+    chests = chests.filter(c => c !== ch);
+    spawnParticles(ch.x, ch.y, '#9b59b6', 14);
+    addFloatText(ch.x, ch.y - 24, 'MIMIC!', '#e74c3c');
+    const def = ENEMY_DEFS.mimic;
+    enemies.push({
+      x: ch.x, y: ch.y,
+      w: def.w, h: def.h,
+      hp: def.hp + Math.floor(wave * def.hp * 0.12),
+      maxHp: def.hp + Math.floor(wave * def.hp * 0.12),
+      speed: def.speed + wave * 0.04,
+      score: def.score,
+      goldDrop: def.gold,
+      potionChance: def.potion,
+      type: 'mimic',
+      anim: 'mimic',
+      dead: false,
+      hitFlash: 0,
+    });
+  } else if (roll < 0.6) {
+    // gold burst
+    const n = 6 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < n; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      coins.push({
+        x: ch.x, y: ch.y,
+        vx: Math.cos(angle) * 2.5,
+        vy: Math.sin(angle) * 2.5,
+        dead: false,
+        bob: Math.random() * Math.PI * 2,
+      });
+    }
+    spawnParticles(ch.x, ch.y, '#ffd700', 12);
+  } else {
+    potions.push({ x: ch.x, y: ch.y - 20, bob: 0, dead: false });
+    spawnParticles(ch.x, ch.y, '#2ecc71', 8);
+  }
+}
+
+// ─── Floating combat text ─────────────────────────────────────────────────────
+function addFloatText(x, y, text, color) {
+  floatTexts.push({ x, y, text, color, life: 1 });
+}
+
+function updateFloatTexts(dt) {
+  for (const t of floatTexts) {
+    t.y    -= dt * 0.035;
+    t.life -= dt / 1100;
+  }
+  floatTexts = floatTexts.filter(t => t.life > 0);
 }
 
 // ─── Weapon upgrades ──────────────────────────────────────────────────────────
@@ -831,13 +1019,16 @@ function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawTiles();
   drawTorches();
+  drawChests();
   drawCoins();
+  drawPotions();
   drawUpgrades();
   drawBullets();
   drawMeleeSwings();
   drawEnemies();
   drawPlayer();
   drawParticles();
+  drawFloatTexts();
 }
 
 // Tiles
@@ -1049,6 +1240,52 @@ function drawCoins() {
     drawSprite(COIN_FRAMES[animTick], c.x, c.y + bobY, false);
     ctx.shadowBlur = 0;
   }
+}
+
+// Potions
+function drawPotions() {
+  for (const pt of potions) {
+    if (pt.dead) continue;
+    const bobY = Math.sin(pt.bob) * 2;
+    ctx.shadowColor = '#e74c3c';
+    ctx.shadowBlur  = 8;
+    drawSprite(FLASK_RED, pt.x, pt.y + bobY, false);
+    ctx.shadowBlur = 0;
+  }
+}
+
+// Chests
+function drawChests() {
+  for (const ch of chests) {
+    let frame;
+    if (ch.state === 'closed')       frame = CHEST_FRAMES[0];
+    else if (ch.state === 'opening') frame = CHEST_FRAMES[Math.min(2, Math.floor(ch.timer / 120))];
+    else                             frame = CHEST_EMPTY;
+
+    if (ch.state === 'closed') {
+      // soft golden shimmer so it catches the eye
+      const glow = 0.5 + Math.sin(performance.now() / 300) * 0.3;
+      ctx.shadowColor = `rgba(255,215,0,${glow})`;
+      ctx.shadowBlur  = 10;
+    }
+    drawSprite(frame, ch.x, ch.y, false);
+    ctx.shadowBlur = 0;
+  }
+}
+
+// Floating combat text
+function drawFloatTexts() {
+  ctx.font         = '10px "Press Start 2P", monospace';
+  ctx.textAlign    = 'center';
+  for (const t of floatTexts) {
+    ctx.globalAlpha = Math.min(1, t.life * 1.5);
+    ctx.fillStyle   = '#000';
+    ctx.fillText(t.text, t.x + 1, t.y + 1);
+    ctx.fillStyle   = t.color;
+    ctx.fillText(t.text, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign   = 'left';
 }
 
 // Particles
