@@ -222,6 +222,12 @@ const finalScore   = document.getElementById('final-score');
 const finalWave    = document.getElementById('final-wave');
 const finalGold    = document.getElementById('final-gold');
 
+// buttons drop focus after click so Space (attack key) never re-activates them
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (btn) btn.blur();
+});
+
 document.getElementById('btn-start').addEventListener('click',   startGame);
 document.getElementById('btn-resume').addEventListener('click',  resumeGame);
 document.getElementById('btn-quit').addEventListener('click',    quitGame);
@@ -270,6 +276,8 @@ function resizeCanvas() {
 
 function onKeyDown(e) {
   keys[e.code] = true;
+  // Space/arrows must never re-trigger a focused button or scroll the page
+  if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   if (e.code === 'KeyE') castSpecial();
   if (e.code === 'Escape') {
     if (gameState === 'playing') pauseGame();
