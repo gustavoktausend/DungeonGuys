@@ -423,6 +423,7 @@ html, body {
   color: var(--torch-orange);
   text-shadow: 0 0 20px var(--torch-orange);
   letter-spacing: 0.2em;
+  opacity: 0; /* invisible unless .show is animating */
   pointer-events: none;
   z-index: 6;
   text-align: center;

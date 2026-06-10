@@ -361,13 +361,14 @@ function pickEnemyType(w) {
   return r < 0.35 ? 'skeleton' : r < 0.65 ? 'goblin' : r < 0.85 ? 'demon' : 'brute';
 }
 
+let announceTimer = null;
 function announceWave(text) {
   waveAnnounce.textContent = text;
-  waveAnnounce.className   = '';
-  void waveAnnounce.offsetWidth;
+  waveAnnounce.classList.remove('hidden', 'show');
+  void waveAnnounce.offsetWidth; // restart the CSS animation
   waveAnnounce.classList.add('show');
-  setTimeout(() => waveAnnounce.classList.add('hidden'), 2600);
-  setTimeout(() => waveAnnounce.classList.remove('hidden', 'show'), 2700);
+  clearTimeout(announceTimer); // overlapping announces: latest one wins
+  announceTimer = setTimeout(() => waveAnnounce.classList.remove('show'), 2600);
 }
 
 // ─── Main Loop ────────────────────────────────────────────────────────────────
