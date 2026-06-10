@@ -122,18 +122,64 @@ let animId     = null;
 let player, bullets, enemies, coins, particles, meleeSwings, upgrades;
 let potions, chests, floatTexts;
 
-// ─── Shop (between waves) ─────────────────────────────────────────────────────
-const SHOP_ITEMS = {
-  heal:   { base: 10, scale: 1,    apply: () => { player.hp = Math.min(player.maxHp, player.hp + 30); } },
-  maxhp:  { base: 25, scale: 1.35, apply: () => { player.maxHp += 20; player.hp += 20; } },
-  damage: { base: 30, scale: 1.35, apply: () => { player.dmgMult *= 1.10; } },
-  speed:  { base: 25, scale: 1.35, apply: () => { player.speed *= 1.08; } },
-};
-let shopBought = {};
+// ─── Player stats (Brotato-style) ─────────────────────────────────────────────
+// flat damage is per weapon kind: melee (warrior), ranged (archer), elemental (mage)
+function baseStats() {
+  return {
+    hpRegen: 0,       // 0.2 HP/s per point
+    lifeSteal: 0,     // % chance to heal 1 HP per hit
+    dmgPct: 0,        // % damage on everything
+    meleeDmg: 0,      // flat
+    rangedDmg: 0,     // flat
+    elementalDmg: 0,  // flat
+    atkSpeedPct: 0,   // % faster attacks
+    crit: 0,          // % chance, crits deal x2
+    armor: 0,         // reduction = armor / (armor + 15)
+    dodge: 0,         // % chance to ignore a hit, capped at 60
+    range: 0,         // flat px (melee gets half)
+    speedPct: 0,      // % move speed
+    luck: 0,          // % more potion drops / chest spawns
+  };
+}
 
-function shopPrice(key) {
-  const it = SHOP_ITEMS[key];
-  return Math.round(it.base * Math.pow(it.scale, shopBought[key] || 0));
+const STAT_LABELS = {
+  hpRegen: 'HP REGEN', lifeSteal: 'LIFESTEAL', dmgPct: 'DAMAGE',
+  meleeDmg: 'MELEE DMG', rangedDmg: 'RANGED DMG', elementalDmg: 'ELEM DMG',
+  atkSpeedPct: 'ATK SPEED', crit: 'CRIT', armor: 'ARMOR',
+  dodge: 'DODGE', range: 'RANGE', speedPct: 'SPEED', luck: 'LUCK',
+  maxHp: 'MAX HP',
+};
+const PCT_STATS = new Set(['dmgPct', 'atkSpeedPct', 'speedPct', 'crit', 'dodge', 'lifeSteal', 'luck']);
+
+// ─── Shop items (4 random offers per wave; some have downsides) ───────────────
+// cls restricts the offer to one class (no dead picks)
+const ITEM_POOL = [
+  { name: 'WHETSTONE',       icon: '🗡', price: 18, cls: 'warrior', mods: { meleeDmg: 3 } },
+  { name: 'BROADHEAD TIPS',  icon: '🏹', price: 18, cls: 'archer',  mods: { rangedDmg: 3 } },
+  { name: 'FIRE GEM',        icon: '🔥', price: 18, cls: 'mage',    mods: { elementalDmg: 3 } },
+  { name: 'POWER CRYSTAL',   icon: '💎', price: 30, mods: { dmgPct: 8 } },
+  { name: 'SWIFT BOOTS',     icon: '👢', price: 24, mods: { speedPct: 8 } },
+  { name: 'HEAVY PLATE',     icon: '🛡', price: 28, mods: { armor: 3, speedPct: -3 } },
+  { name: 'LUCKY CLOVER',    icon: '🍀', price: 20, mods: { luck: 15 } },
+  { name: 'VAMPIRE FANG',    icon: '🦇', price: 32, mods: { lifeSteal: 4 } },
+  { name: 'HEALING HERBS',   icon: '🌿', price: 26, mods: { hpRegen: 2 } },
+  { name: 'ADRENALINE VIAL', icon: '⚡', price: 30, mods: { atkSpeedPct: 10 } },
+  { name: 'EAGLE EYE',       icon: '👁', price: 20, mods: { range: 30 } },
+  { name: 'JAGGED DAGGER',   icon: '🔪', price: 30, mods: { crit: 8 } },
+  { name: 'GIANT BELT',      icon: '🥋', price: 34, mods: { maxHp: 25, speedPct: -4 } },
+  { name: 'SHADOW CLOAK',    icon: '🌑', price: 30, mods: { dodge: 8, dmgPct: -5 } },
+  { name: 'BLOOD PACT',      icon: '🩸', price: 40, mods: { meleeDmg: 4, rangedDmg: 4, elementalDmg: 4, maxHp: -15 } },
+  { name: 'BERSERK TONIC',   icon: '🧪', price: 35, mods: { atkSpeedPct: 15, armor: -2 } },
+  { name: 'TOWER SHIELD',    icon: '🏰', price: 36, mods: { armor: 5, atkSpeedPct: -8 } },
+  { name: 'CURSED SKULL',    icon: '💀', price: 38, mods: { dmgPct: 15, maxHp: -10, hpRegen: -1 } },
+];
+
+let shopOffers = [];
+let rerollCost = 5;
+const HEAL_PRICE = 10;
+
+function itemPrice(item) {
+  return Math.round(item.price * (1 + (wave - 1) * 0.06)); // gets pricier as waves go
 }
 let score, gold, wave, waveTimer, waveActive;
 let nextWaveDelay = 3000;
@@ -169,8 +215,11 @@ document.getElementById('btn-quit').addEventListener('click',    quitGame);
 document.getElementById('btn-restart').addEventListener('click', startGame);
 
 document.getElementById('btn-next-wave').addEventListener('click', closeShop);
-document.querySelectorAll('.shop-item').forEach(btn => {
-  btn.addEventListener('click', () => buyShopItem(btn.dataset.item));
+document.getElementById('btn-shop-heal').addEventListener('click', shopHeal);
+document.getElementById('btn-shop-reroll').addEventListener('click', shopReroll);
+document.getElementById('shop-items').addEventListener('click', e => {
+  const btn = e.target.closest('.shop-item[data-i]');
+  if (btn) buyOffer(Number(btn.dataset.i));
 });
 
 document.querySelectorAll('.class-card').forEach(card => {
@@ -326,7 +375,6 @@ function startGame() {
   potions     = [];
   chests      = [];
   floatTexts  = [];
-  shopBought  = {};
 
   const cls = CLASS_DEFS[selectedClass];
   player = {
@@ -340,7 +388,8 @@ function startGame() {
     tier: 0,
     weapon: cls.tiers[0],
     specialTimer: 0,
-    dmgMult: 1,
+    stats: baseStats(),
+    regenAcc: 0,
     invincible: 0,
     facing: 0,
     walkFrame: 0,
@@ -394,7 +443,7 @@ function startNextWave() {
   announceWave(`— WAVE ${wave} —`);
 
   // a chest may appear somewhere in the arena (might be a mimic...)
-  if (wave >= 2 && Math.random() < 0.6) {
+  if (wave >= 2 && Math.random() < Math.min(0.95, 0.6 * (1 + player.stats.luck / 100))) {
     const m = 90;
     chests.push({
       x: PLAY.left + m + Math.random() * (PLAY.right  - PLAY.left - m * 2),
@@ -457,6 +506,16 @@ function updatePlayer(dt) {
   if (p.invincible > 0) p.invincible -= dt;
   if (p.specialTimer > 0) p.specialTimer -= dt;
 
+  // passive HP regen: 0.2 HP/s per point, fractional carry
+  if (p.stats.hpRegen > 0 && p.hp < p.maxHp) {
+    p.regenAcc += (dt / 1000) * 0.2 * p.stats.hpRegen;
+    if (p.regenAcc >= 1) {
+      const heal = Math.floor(p.regenAcc);
+      p.regenAcc -= heal;
+      p.hp = Math.min(p.maxHp, p.hp + heal);
+    }
+  }
+
   let dx = 0, dy = 0;
   if (keys['KeyW'] || keys['ArrowUp'])    dy -= 1;
   if (keys['KeyS'] || keys['ArrowDown'])  dy += 1;
@@ -471,8 +530,9 @@ function updatePlayer(dt) {
     if (p.walkTimer > 120) { p.walkFrame = (p.walkFrame + 1) % 4; p.walkTimer = 0; }
   }
 
-  const nx = p.x + dx * p.speed * (dt / 16.67);
-  const ny = p.y + dy * p.speed * (dt / 16.67);
+  const effSpeed = p.speed * (1 + p.stats.speedPct / 100);
+  const nx = p.x + dx * effSpeed * (dt / 16.67);
+  const ny = p.y + dy * effSpeed * (dt / 16.67);
   const margin = 10;
   p.x = Math.max(PLAY.left + margin, Math.min(PLAY.right  - margin, nx));
   p.y = Math.max(PLAY.top  + margin, Math.min(PLAY.bottom - margin, ny));
@@ -490,7 +550,8 @@ function attack() {
   if (gameState !== 'playing') return;
   const w = player.weapon;
   const now = performance.now();
-  if (now - lastShot < w.fireRate) return;
+  const effRate = w.fireRate / (1 + player.stats.atkSpeedPct / 100);
+  if (now - lastShot < effRate) return;
   lastShot = now;
 
   const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
@@ -515,7 +576,7 @@ function fireProjectile(angle, type, w) {
     vy: Math.sin(angle + spread) * w.bulletSpeed,
     angle: angle + spread,
     speed: w.bulletSpeed,
-    range: w.range,
+    range: w.range + player.stats.range,
     damage: w.damage,
     pierce: w.pierce || 0,
     aoe: w.aoe || 0,
@@ -528,10 +589,11 @@ function fireProjectile(angle, type, w) {
 
 // ─── Melee ────────────────────────────────────────────────────────────────────
 function meleeAttack(angle, w) {
-  meleeSwings.push({ angle, life: 1, range: w.range, arc: w.arc });
+  const range = w.range + player.stats.range / 2; // melee gets half the range stat
+  meleeSwings.push({ angle, life: 1, range, arc: w.arc });
   spawnParticles(
-    player.x + Math.cos(angle) * w.range * 0.6,
-    player.y + Math.sin(angle) * w.range * 0.6,
+    player.x + Math.cos(angle) * range * 0.6,
+    player.y + Math.sin(angle) * range * 0.6,
     '#ffe066', 4
   );
 
@@ -540,22 +602,19 @@ function meleeAttack(angle, w) {
     const dx = e.x - player.x;
     const dy = e.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > w.range + Math.max(e.w, e.h) / 2) continue;
+    if (dist > range + Math.max(e.w, e.h) / 2) continue;
 
     let diff = Math.atan2(dy, dx) - angle;
     while (diff >  Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
     if (Math.abs(diff) > w.arc / 2) continue;
 
-    e.hp -= rollDamage(w.damage);
-    e.hitFlash = 150;
+    dealDamage(e, w.damage, 'melee');
     // knockback away from player
     if (dist > 1) {
       e.x += (dx / dist) * w.knockback;
       e.y += (dy / dist) * w.knockback;
     }
-    spawnParticles(e.x, e.y, '#ff4444', 6);
-    if (e.hp <= 0) killEnemy(e);
   }
 }
 
@@ -602,9 +661,7 @@ function explode(b) {
     if (e.dead) continue;
     const dx = e.x - b.x, dy = e.y - b.y;
     if (Math.sqrt(dx * dx + dy * dy) <= b.aoe + Math.max(e.w, e.h) / 2) {
-      e.hp -= rollDamage(b.damage);
-      e.hitFlash = 150;
-      if (e.hp <= 0) killEnemy(e);
+      dealDamage(e, b.damage, 'elemental');
     }
   }
 }
@@ -614,9 +671,30 @@ function updateMeleeSwings(dt) {
   meleeSwings = meleeSwings.filter(s => s.life > 0);
 }
 
-function rollDamage([min, max]) {
-  const dmg = min + Math.floor(Math.random() * (max - min + 1));
-  return Math.round(dmg * player.dmgMult);
+// ─── Damage pipeline ──────────────────────────────────────────────────────────
+// flat bonus by weapon kind, then % damage, then crit (x2); lifesteal on hit
+function dealDamage(e, [min, max], kind, fx, fy) {
+  const st = player.stats;
+  let dmg = min + Math.floor(Math.random() * (max - min + 1));
+  dmg += kind === 'melee' ? st.meleeDmg
+       : kind === 'arrow' ? st.rangedDmg
+       : st.elementalDmg; // bolt / fireball
+  dmg = Math.max(1, Math.round(dmg * (1 + st.dmgPct / 100)));
+
+  if (Math.random() < st.crit / 100) {
+    dmg *= 2;
+    addFloatText(e.x, e.y - e.h / 2 - 12, dmg + '!', '#f1c40f');
+  }
+
+  e.hp -= dmg;
+  e.hitFlash = 150;
+  spawnParticles(fx !== undefined ? fx : e.x, fy !== undefined ? fy : e.y, '#ff4444', 6);
+
+  if (Math.random() < st.lifeSteal / 100 && player.hp < player.maxHp) {
+    player.hp = Math.min(player.maxHp, player.hp + 1);
+  }
+
+  if (e.hp <= 0) killEnemy(e);
 }
 
 // Bullets
@@ -645,11 +723,8 @@ function updateBullets(dt) {
           explode(b);
           break;
         }
-        e.hp -= rollDamage(b.damage);
-        e.hitFlash = 150;
         b.hitIds.add(e);
-        spawnParticles(b.x, b.y, '#ff4444', 6);
-        if (e.hp <= 0) killEnemy(e);
+        dealDamage(e, b.damage, b.type, b.x, b.y);
         if (b.pierce > 0) {
           b.pierce--;
         } else {
@@ -715,12 +790,18 @@ function updateEnemies(dt) {
       e.y += (dy / dist) * e.speed * factor;
     }
 
-    // hit player
+    // hit player (dodge avoids it entirely; armor reduces it)
     if (player.invincible <= 0 && rectCircle(e.x, e.y, e.w, e.h, player.x, player.y, 10)) {
-      player.hp -= 8;
       player.invincible = 600;
-      spawnParticles(player.x, player.y, '#ff0000', 8);
-      if (player.hp <= 0) { player.hp = 0; gameOver(); return; }
+      const st = player.stats;
+      if (Math.random() < Math.min(60, st.dodge) / 100) {
+        addFloatText(player.x, player.y - 26, 'DODGE', '#3498db');
+      } else {
+        const dmg = Math.max(1, Math.round(8 * (1 - st.armor / (st.armor + 15))));
+        player.hp -= dmg;
+        spawnParticles(player.x, player.y, '#ff0000', 8);
+        if (player.hp <= 0) { player.hp = 0; gameOver(); return; }
+      }
     }
   }
   enemies = enemies.filter(e => !e.dead);
@@ -742,7 +823,7 @@ function killEnemy(e) {
       bob: Math.random() * Math.PI * 2,
     });
   }
-  if (Math.random() < e.potionChance) {
+  if (Math.random() < e.potionChance * (1 + player.stats.luck / 100)) {
     potions.push({ x: e.x, y: e.y, bob: Math.random() * Math.PI * 2, dead: false });
   }
 }
@@ -835,8 +916,10 @@ function checkWaveComplete() {
 // ─── Shop flow ────────────────────────────────────────────────────────────────
 function openShop() {
   if (gameState !== 'playing') return;
-  gameState = 'shop';
-  refreshShop();
+  gameState  = 'shop';
+  rerollCost = 5;
+  rollOffers();
+  renderShop();
   showScreen('shop');
 }
 
@@ -848,25 +931,97 @@ function closeShop() {
   animId = requestAnimationFrame(loop);
 }
 
-function refreshShop() {
-  document.getElementById('shop-gold').textContent = gold;
-  for (const key of Object.keys(SHOP_ITEMS)) {
-    const price = shopPrice(key);
-    document.getElementById('price-' + key).textContent = price;
-    const btn = document.querySelector(`.shop-item[data-item="${key}"]`);
-    const healFull = key === 'heal' && player.hp >= player.maxHp;
-    btn.disabled = gold < price || healFull;
+function rollOffers() {
+  const pool = ITEM_POOL.filter(it => !it.cls || it.cls === player.cls);
+  const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, 4);
+  shopOffers = picks.map(it => ({ item: it, sold: false }));
+}
+
+function applyMods(mods) {
+  for (const [k, v] of Object.entries(mods)) {
+    if (k === 'maxHp') {
+      player.maxHp = Math.max(30, player.maxHp + v); // items can't kill you
+      if (v > 0) player.hp += v;
+      else player.hp = Math.min(player.hp, player.maxHp);
+    } else {
+      player.stats[k] += v;
+    }
   }
 }
 
-function buyShopItem(key) {
-  const price = shopPrice(key);
+function fmtMod(k, v) {
+  const sign = v > 0 ? '+' : '';
+  return `${sign}${v}${PCT_STATS.has(k) ? '%' : ''} ${STAT_LABELS[k]}`;
+}
+
+function renderShop() {
+  document.getElementById('shop-gold').textContent = gold;
+
+  // offers
+  const wrap = document.getElementById('shop-items');
+  wrap.innerHTML = shopOffers.map((o, i) => {
+    if (o.sold) {
+      return `<div class="shop-item offer sold"><span class="shop-name">SOLD</span></div>`;
+    }
+    const price = itemPrice(o.item);
+    const fx = Object.entries(o.item.mods)
+      .map(([k, v]) => `<span class="${v > 0 ? 'fx-pos' : 'fx-neg'}">${fmtMod(k, v)}</span>`)
+      .join('');
+    return `
+      <button class="shop-item offer" data-i="${i}" ${gold < price ? 'disabled' : ''}>
+        <span class="shop-icon">${o.item.icon}</span>
+        <span class="shop-name">${o.item.name}</span>
+        <span class="shop-effects">${fx}</span>
+        <span class="shop-price">${price}</span>
+      </button>`;
+  }).join('');
+
+  // heal / reroll
+  const healBtn   = document.getElementById('btn-shop-heal');
+  const rerollBtn = document.getElementById('btn-shop-reroll');
+  document.getElementById('price-heal').textContent   = HEAL_PRICE;
+  document.getElementById('price-reroll').textContent = rerollCost;
+  healBtn.disabled   = gold < HEAL_PRICE || player.hp >= player.maxHp;
+  rerollBtn.disabled = gold < rerollCost;
+
+  // stats panel
+  const st = player.stats;
+  const rows = [['MAX HP', player.maxHp], ['HP', Math.ceil(player.hp)]]
+    .concat(Object.keys(st).map(k => [
+      STAT_LABELS[k],
+      (st[k] > 0 ? '+' : '') + st[k] + (PCT_STATS.has(k) ? '%' : ''),
+    ]));
+  document.getElementById('shop-stats').innerHTML =
+    rows.map(([l, v]) => `<div class="stat-line"><span>${l}</span><span>${v}</span></div>`).join('');
+}
+
+function buyOffer(i) {
+  const o = shopOffers[i];
+  if (!o || o.sold) return;
+  const price = itemPrice(o.item);
   if (gold < price) return;
   gold -= price;
-  shopBought[key] = (shopBought[key] || 0) + 1;
-  SHOP_ITEMS[key].apply();
+  o.sold = true;
+  applyMods(o.item.mods);
   updateHUD();
-  refreshShop();
+  renderShop();
+}
+
+function shopHeal() {
+  if (gold < HEAL_PRICE || player.hp >= player.maxHp) return;
+  gold -= HEAL_PRICE;
+  player.hp = Math.min(player.maxHp, player.hp + 30);
+  updateHUD();
+  renderShop();
+}
+
+function shopReroll() {
+  if (gold < rerollCost) return;
+  gold -= rerollCost;
+  rerollCost += 5;
+  rollOffers();
+  updateHUD();
+  renderShop();
 }
 
 // ─── Potions (auto-used on touch) ─────────────────────────────────────────────

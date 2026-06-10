@@ -302,12 +302,75 @@ html, body {
   text-shadow: 0 0 8px rgba(241,196,15,0.6);
 }
 
+.shop-main {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  align-items: stretch;
+}
+
 .shop-items {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  width: 100%;
+  flex: 1;
 }
+
+.shop-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0,0,0,0.35);
+  min-width: 150px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.stat-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: clamp(4px, 0.9vw, 7px);
+  color: rgba(232,220,200,0.7);
+  letter-spacing: 0.05em;
+}
+.stat-line span:last-child { color: var(--torch-yellow); }
+
+.shop-effects {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+}
+.fx-pos, .fx-neg {
+  font-size: clamp(4px, 0.85vw, 6.5px);
+  letter-spacing: 0.04em;
+}
+.fx-pos { color: #2ecc71; }
+.fx-neg { color: #e74c3c; }
+
+.shop-item.sold {
+  opacity: 0.3;
+  justify-content: center;
+  cursor: default;
+}
+
+.shop-bottom {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  justify-content: center;
+}
+
+.shop-item.small {
+  flex-direction: row;
+  padding: 10px 16px;
+  font-size: clamp(5px, 1.1vw, 8px);
+  gap: 6px;
+}
+.shop-item.small span { color: var(--gold-coin); }
 
 .shop-item {
   font-family: var(--pixel-font);

@@ -65,27 +65,13 @@
       <div class="screen-inner compact shop-inner">
         <div class="shop-title">◆ SHOP ◆</div>
         <div class="shop-gold">GOLD <span id="shop-gold">0</span></div>
-        <div class="shop-items">
-          <button class="shop-item" data-item="heal">
-            <span class="shop-icon heal-icon">✚</span>
-            <span class="shop-name">HEAL 30 HP</span>
-            <span class="shop-price" id="price-heal">10</span>
-          </button>
-          <button class="shop-item" data-item="maxhp">
-            <span class="shop-icon maxhp-icon">❤</span>
-            <span class="shop-name">+20 MAX HP</span>
-            <span class="shop-price" id="price-maxhp">25</span>
-          </button>
-          <button class="shop-item" data-item="damage">
-            <span class="shop-icon dmg-icon">⚔</span>
-            <span class="shop-name">+10% DAMAGE</span>
-            <span class="shop-price" id="price-damage">30</span>
-          </button>
-          <button class="shop-item" data-item="speed">
-            <span class="shop-icon spd-icon">➤</span>
-            <span class="shop-name">+8% SPEED</span>
-            <span class="shop-price" id="price-speed">25</span>
-          </button>
+        <div class="shop-main">
+          <div id="shop-items" class="shop-items"></div>
+          <div id="shop-stats" class="shop-stats"></div>
+        </div>
+        <div class="shop-bottom">
+          <button id="btn-shop-heal" class="shop-item small">✚ HEAL 30 — <span id="price-heal">10</span> G</button>
+          <button id="btn-shop-reroll" class="shop-item small">↺ REROLL — <span id="price-reroll">5</span> G</button>
         </div>
         <button id="btn-next-wave" class="btn-pixel">▶ NEXT WAVE</button>
       </div>
