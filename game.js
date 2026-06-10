@@ -885,7 +885,11 @@ function updatePotions(dt) {
 // ─── Chests ───────────────────────────────────────────────────────────────────
 function updateChests(dt) {
   for (const ch of chests) {
-    if (ch.state === 'looted') continue;
+    if (ch.state === 'looted') {
+      // empty chest lingers a moment, then fades away
+      ch.fade -= dt / 1500;
+      continue;
+    }
 
     if (ch.state === 'opening') {
       ch.timer += dt;
@@ -900,10 +904,12 @@ function updateChests(dt) {
       ch.timer = 0;
     }
   }
+  chests = chests.filter(ch => ch.state !== 'looted' || ch.fade > 0);
 }
 
 function lootChest(ch) {
   ch.state = 'looted';
+  ch.fade  = 1;
   const roll = Math.random();
 
   if (roll < 0.15) {
@@ -1267,9 +1273,12 @@ function drawChests() {
       const glow = 0.5 + Math.sin(performance.now() / 300) * 0.3;
       ctx.shadowColor = `rgba(255,215,0,${glow})`;
       ctx.shadowBlur  = 10;
+    } else if (ch.state === 'looted') {
+      ctx.globalAlpha = Math.max(0, ch.fade);
     }
     drawSprite(frame, ch.x, ch.y, false);
-    ctx.shadowBlur = 0;
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 1;
   }
 }
 
