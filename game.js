@@ -40,12 +40,23 @@ const FLOOR_TILES = [
   [32, 80, 16, 16], [48, 80, 16, 16], [16, 96, 16, 16], [32, 96, 16, 16],
 ];
 const WALL_TILES = {
-  mid:     [32, 16, 16, 16],
-  top:     [32,  0, 16, 16],
+  mid:       [32, 16, 16, 16],
+  left:      [16, 16, 16, 16],
+  right:     [48, 16, 16, 16],
+  top:       [32,  0, 16, 16],
+  top_left:  [16,  0, 16, 16],
+  top_right: [48,  0, 16, 16],
+  edge_left:     [32, 152, 16, 16],
+  edge_right:    [48, 152, 16, 16],
+  edge_bot_left: [32, 168, 16, 16],
+  edge_bot_right:[48, 168, 16, 16],
   banner_red:  [16, 32, 16, 16],
   banner_blue: [32, 32, 16, 16],
   hole:    [48, 32, 16, 16],
 };
+
+// playable area inside the walls (recomputed on resize)
+let PLAY = { left: TILE, right: 0, top: TILE * 2, bottom: 0 };
 
 let animTick = 0; // global 4-frame animation clock
 
@@ -187,65 +198,86 @@ function hideAllScreens() { showScreen(null); }
 let floorCanvas = null;
 
 function buildTileMap() {
-  mapCols = Math.ceil(canvas.width  / TILE) + 2;
-  mapRows = Math.ceil(canvas.height / TILE) + 2;
+  mapCols = Math.ceil(canvas.width  / TILE) + 1;
+  mapRows = Math.ceil(canvas.height / TILE) + 1;
   tileMap = [];
   for (let r = 0; r < mapRows; r++) {
     tileMap[r] = [];
     for (let c = 0; c < mapCols; c++) {
-      // edge tiles are walls, rest are floor with slight variation
-      const edge = (r === 0 || r === mapRows - 1 || c === 0 || c === mapCols - 1);
-      tileMap[r][c] = { wall: edge, variant: Math.random() };
+      tileMap[r][c] = { variant: Math.random() };
     }
   }
+
+  PLAY = {
+    left:   TILE,
+    right:  canvas.width - TILE,
+    top:    TILE * 2,
+    bottom: canvas.height - TILE * 2,
+  };
+
+  TORCH_POSITIONS.length = 0; // repositioned for the new size
   renderFloorCanvas();
 }
 
 // pre-renders the whole tilemap once; drawTiles() then blits a single image
 function renderFloorCanvas() {
   if (!SHEET.complete || SHEET.naturalWidth === 0) return; // retried on SHEET load
+  const W = canvas.width, H = canvas.height;
   floorCanvas = document.createElement('canvas');
-  floorCanvas.width  = canvas.width;
-  floorCanvas.height = canvas.height;
+  floorCanvas.width  = W;
+  floorCanvas.height = H;
   const f = floorCanvas.getContext('2d');
   f.imageSmoothingEnabled = false;
 
   const blit = ([sx, sy, sw, sh], x, y) =>
     f.drawImage(SHEET, sx, sy, sw, sh, x, y, TILE, TILE);
 
+  // floor covers everything; walls are drawn over it, anchored to the borders
   for (let r = 0; r < mapRows; r++) {
     for (let c = 0; c < mapCols; c++) {
-      const t = tileMap[r][c];
-      const x = (c - 1) * TILE;
-      const y = (r - 1) * TILE;
-
-      if (!t.wall) {
-        // mostly plain floor; light variants only, heavy cracks are too noisy
-        const tile = t.variant < 0.88
-          ? FLOOR_TILES[0]
-          : FLOOR_TILES[1 + Math.floor(t.variant * 31) % 5];
-        blit(tile, x, y);
-        continue;
-      }
-
-      if (r === 0) {
-        // top wall face, with the occasional banner or crumbled hole
-        const deco = t.variant < 0.06 ? WALL_TILES.banner_red
-                   : t.variant < 0.12 ? WALL_TILES.banner_blue
-                   : t.variant < 0.18 ? WALL_TILES.hole
-                   : WALL_TILES.mid;
-        blit(WALL_TILES.mid, x, y);
-        blit(deco, x, y);
-      } else {
-        // side/bottom walls read as a stone cap seen from above
-        blit(WALL_TILES.top, x, y);
-      }
+      // mostly plain floor; light variants only, heavy cracks are too noisy
+      const v = tileMap[r][c].variant;
+      const tile = v < 0.88
+        ? FLOOR_TILES[0]
+        : FLOOR_TILES[1 + Math.floor(v * 31) % 5];
+      blit(tile, c * TILE, r * TILE);
     }
   }
 
   // darken the floor slightly so torch glow stands out
   f.fillStyle = 'rgba(0,0,10,0.25)';
-  f.fillRect(0, 0, floorCanvas.width, floorCanvas.height);
+  f.fillRect(0, 0, W, H);
+
+  // ── walls ──
+  // top: cap row + face row (banner / crumbled hole flavor on the face)
+  for (let x = 0; x < W; x += TILE) {
+    blit(WALL_TILES.top, x, 0);
+    const v = tileMap[0][Math.floor(x / TILE)].variant;
+    const face = v < 0.06 ? WALL_TILES.banner_red
+               : v < 0.12 ? WALL_TILES.banner_blue
+               : v < 0.18 ? WALL_TILES.hole
+               : WALL_TILES.mid;
+    blit(WALL_TILES.mid, x, TILE);
+    blit(face, x, TILE);
+  }
+  blit(WALL_TILES.top_left,  0,        0);
+  blit(WALL_TILES.left,      0,        TILE);
+  blit(WALL_TILES.top_right, W - TILE, 0);
+  blit(WALL_TILES.right,     W - TILE, TILE);
+
+  // bottom: cap row + face row
+  for (let x = 0; x < W; x += TILE) {
+    blit(WALL_TILES.top, x, H - TILE * 2);
+    blit(WALL_TILES.mid, x, H - TILE);
+  }
+
+  // side columns between top face and bottom cap
+  for (let y = TILE * 2; y < H - TILE * 2; y += TILE) {
+    blit(WALL_TILES.edge_left,  0,        y);
+    blit(WALL_TILES.edge_right, W - TILE, y);
+  }
+  blit(WALL_TILES.edge_bot_left,  0,        H - TILE * 2);
+  blit(WALL_TILES.edge_bot_right, W - TILE, H - TILE * 2);
 }
 
 // ─── Game start/stop ──────────────────────────────────────────────────────────
@@ -386,9 +418,9 @@ function updatePlayer(dt) {
 
   const nx = p.x + dx * p.speed * (dt / 16.67);
   const ny = p.y + dy * p.speed * (dt / 16.67);
-  const margin = 8;
-  p.x = Math.max(margin, Math.min(canvas.width  - margin, nx));
-  p.y = Math.max(margin, Math.min(canvas.height - margin, ny));
+  const margin = 10;
+  p.x = Math.max(PLAY.left + margin, Math.min(PLAY.right  - margin, nx));
+  p.y = Math.max(PLAY.top  + margin, Math.min(PLAY.bottom - margin, ny));
 
   // face toward mouse
   p.facing = Math.atan2(mouse.y - p.y, mouse.x - p.x);
@@ -541,8 +573,8 @@ function updateBullets(dt) {
     b.dist += b.speed * factor;
 
     if (b.dist > b.range ||
-        b.x < 0 || b.x > canvas.width ||
-        b.y < 0 || b.y > canvas.height) {
+        b.x < PLAY.left || b.x > PLAY.right ||
+        b.y < PLAY.top  || b.y > PLAY.bottom) {
       b.dead = true;
       if (b.type === 'fireball') explode(b);
       else spawnParticles(b.x, b.y, '#ff8c00', 3);
@@ -586,11 +618,15 @@ function spawnEnemy(type) {
   const def  = ENEMY_DEFS[type];
   const side = Math.floor(Math.random() * 4);
   let x, y;
-  const pad = 20;
-  if (side === 0) { x = Math.random() * canvas.width;  y = -pad; }
-  else if (side === 1) { x = canvas.width + pad;  y = Math.random() * canvas.height; }
-  else if (side === 2) { x = Math.random() * canvas.width;  y = canvas.height + pad; }
-  else                 { x = -pad; y = Math.random() * canvas.height; }
+  // spawn hugging the inside of a wall, with a puff so it reads as intentional
+  const pad = 16;
+  const rx  = () => PLAY.left + Math.random() * (PLAY.right  - PLAY.left);
+  const ry  = () => PLAY.top  + Math.random() * (PLAY.bottom - PLAY.top);
+  if (side === 0)      { x = rx(); y = PLAY.top + pad; }
+  else if (side === 1) { x = PLAY.right - pad; y = ry(); }
+  else if (side === 2) { x = rx(); y = PLAY.bottom - pad; }
+  else                 { x = PLAY.left + pad; y = ry(); }
+  spawnParticles(x, y, '#9b59b6', 8);
 
   enemies.push({
     x, y,
@@ -820,15 +856,15 @@ function drawTiles() {
 const TORCH_POSITIONS = [];
 function drawTorches() {
   if (TORCH_POSITIONS.length === 0) {
-    const margin = TILE * 2;
+    // torches sit on the walls themselves
     const spacing = 160;
-    for (let x = margin; x < canvas.width - margin; x += spacing) {
-      TORCH_POSITIONS.push({ x, y: margin });
-      TORCH_POSITIONS.push({ x, y: canvas.height - margin });
+    for (let x = TILE * 2.5; x < canvas.width - TILE * 2; x += spacing) {
+      TORCH_POSITIONS.push({ x, y: TILE * 1.4 });
+      TORCH_POSITIONS.push({ x, y: canvas.height - TILE * 1.5 });
     }
-    for (let y = margin + spacing; y < canvas.height - margin; y += spacing) {
-      TORCH_POSITIONS.push({ x: margin, y });
-      TORCH_POSITIONS.push({ x: canvas.width - margin, y });
+    for (let y = TILE * 3.5; y < canvas.height - TILE * 3; y += spacing) {
+      TORCH_POSITIONS.push({ x: TILE * 0.5, y });
+      TORCH_POSITIONS.push({ x: canvas.width - TILE * 0.5, y });
     }
   }
 
