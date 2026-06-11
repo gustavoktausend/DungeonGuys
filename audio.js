@@ -70,6 +70,7 @@ const Sfx = (() => {
 
   const SOUNDS = {
     shoot:     () => tone({ freq: 740, type: 'square', dur: 0.09, vol: 0.15, slide: -350 }),
+    eshoot:    () => tone({ freq: 330, type: 'sawtooth', dur: 0.12, vol: 0.12, slide: -180 }),
     arrow:     () => noise({ dur: 0.12, vol: 0.18, freq: 2800, slide: -1800 }),
     swing:     () => noise({ dur: 0.14, vol: 0.2, freq: 1000, slide: -650 }),
     hit:       () => { tone({ freq: 200, type: 'triangle', dur: 0.06, vol: 0.22, slide: -70 });

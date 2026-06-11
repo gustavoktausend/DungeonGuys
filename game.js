@@ -27,6 +27,8 @@ const ANIMS = {
   big_demon: { idle: frames( 16, 428, 32, 36, 4), run: frames(144, 428, 32, 36, 4) },
   big_zombie:{ idle: frames( 16, 332, 32, 36, 4), run: frames(144, 332, 32, 36, 4) },
   ogre:      { idle: frames( 16, 380, 32, 36, 4), run: frames(144, 380, 32, 36, 4) },
+  necromancer: { idle: frames(368, 225, 16, 23, 4), run: frames(368, 225, 16, 23, 4) },
+  swampy:      { idle: frames(432, 112, 16, 16, 4), run: frames(432, 112, 16, 16, 4) },
 };
 // mimic only has a 3-frame "open" anim; ping-pong it to fit the 4-frame clock
 const MIMIC_F = frames(304, 432, 16, 16, 3);
@@ -221,6 +223,7 @@ let lastTime   = 0;
 let animId     = null;
 
 let player, bullets, enemies, coins, particles, meleeSwings, upgrades;
+let enemyBullets = [];
 let potions, chests, floatTexts;
 
 // ─── Player stats (Brotato-style) ─────────────────────────────────────────────
@@ -748,6 +751,7 @@ function startGame() {
   waveTimer  = 0;
   spawnQueue  = [];
   bullets     = [];
+  enemyBullets = [];
   enemies     = [];
   coins       = [];
   particles   = [];
@@ -827,6 +831,7 @@ function startNextWave() {
   coins   = [];
   potions = [];
   chests  = [];
+  enemyBullets = [];
 
   const bossType = BOSS_WAVES[wave];
   // boss waves have a smaller escort so the boss is the show
@@ -862,10 +867,19 @@ function startNextWave() {
 }
 
 function pickEnemyType(w) {
-  const r = Math.random();
-  if (w < 2)  return r < 0.8 ? 'skeleton' : 'goblin';
-  if (w < 4)  return r < 0.5 ? 'skeleton' : r < 0.8 ? 'goblin' : 'demon';
-  return r < 0.35 ? 'skeleton' : r < 0.65 ? 'goblin' : r < 0.85 ? 'demon' : 'brute';
+  // weighted table; stronger/special enemies unlock as waves go
+  const table = [['skeleton', 40], ['goblin', w >= 2 ? 28 : 12]];
+  if (w >= 3) table.push(['demon', 16], ['swampy', 12]);
+  if (w >= 4) table.push(['necromancer', 13]);
+  if (w >= 5) table.push(['brute', 11]);
+
+  let total = 0;
+  for (const [, p] of table) total += p;
+  let r = Math.random() * total;
+  for (const [type, p] of table) {
+    if ((r -= p) <= 0) return type;
+  }
+  return 'skeleton';
 }
 
 let announceTimer = null;
@@ -894,6 +908,7 @@ function loop(ts) {
 function update(dt) {
   updatePlayer(dt);
   updateBullets(dt);
+  updateEnemyBullets(dt);
   updateMeleeSwings(dt);
   updateEnemies(dt);
   updateUpgrades(dt);
@@ -1224,6 +1239,31 @@ function updateBullets(dt) {
   bullets = bullets.filter(b => !b.dead);
 }
 
+// Enemy projectiles (necromancer bolts)
+function updateEnemyBullets(dt) {
+  const factor = dt / 16.67;
+  for (const b of enemyBullets) {
+    if (b.dead) continue;
+    b.x    += b.vx * factor;
+    b.y    += b.vy * factor;
+    b.dist += Math.sqrt(b.vx * b.vx + b.vy * b.vy) * factor;
+
+    if (b.dist > 600 ||
+        b.x < PLAY.left || b.x > PLAY.right ||
+        b.y < PLAY.top  || b.y > PLAY.bottom) {
+      b.dead = true;
+      continue;
+    }
+    const dx = b.x - player.x, dy = b.y - player.y;
+    if (Math.sqrt(dx * dx + dy * dy) < 12) {
+      b.dead = true;
+      spawnParticles(b.x, b.y, '#9b59b6', 6);
+      damagePlayer(b.dmg);
+    }
+  }
+  enemyBullets = enemyBullets.filter(b => !b.dead);
+}
+
 // Enemies
 const ENEMY_DEFS = {
   skeleton: { hp: 50,  speed: 1.1, w: 26, h: 26, score: 10, gold: 1, anim: 'skelet',    potion: 0.03, dmg: 8  },
@@ -1231,6 +1271,12 @@ const ENEMY_DEFS = {
   demon:    { hp: 90,  speed: 0.9, w: 26, h: 40, score: 25, gold: 3, anim: 'chort',     potion: 0.08, dmg: 10 },
   brute:    { hp: 200, speed: 0.6, w: 52, h: 62, score: 50, gold: 6, anim: 'big_demon', potion: 0.25, dmg: 14 },
   mimic:    { hp: 130, speed: 1.5, w: 26, h: 24, score: 40, gold: 8, anim: 'mimic',     potion: 0.5,  dmg: 10 },
+  // shooter: keeps its distance and lobs dark bolts at the player
+  necromancer: { hp: 70, speed: 0.85, w: 26, h: 38, score: 30, gold: 4, anim: 'necromancer', potion: 0.1, dmg: 8,
+                 shooter: { range: 260, interval: 2200, bulletSpeed: 4.5, dmg: 10 } },
+  // exploder: sprints at the player, flashes, and detonates
+  swampy:      { hp: 45, speed: 2.0,  w: 24, h: 24, score: 20, gold: 2, anim: 'swampy', potion: 0.05, dmg: 4,
+                 exploder: { fuse: 700, radius: 90, dmg: 18, triggerDist: 55 } },
   // bosses (wave 8 and 16) — bigger sprite scale, summon minions, big loot
   zombie_king:  { hp: 1500, speed: 0.8,  w: 76, h: 92, score: 500,  gold: 25, anim: 'big_zombie', potion: 1, dmg: 16,
                   boss: 'ZOMBIE KING',  scale: 3, summons: ['skeleton', 'goblin'] },
@@ -1380,7 +1426,41 @@ function makeEnemy(type, x, y) {
     poisonT: 0,
     poisonDps: 0,
     slowT: 0,
+    shooter: def.shooter || null,
+    shootT: 0,
+    exploder: def.exploder || null,
+    fusing: false,
+    fuseT: 0,
   };
+}
+
+// exploder went off by itself: no loot, no xp — just the blast
+function selfDetonate(e) {
+  e.dead = true;
+  Sfx.play('explosion');
+  spawnParticles(e.x, e.y, '#2ecc71', 20);
+  spawnParticles(e.x, e.y, '#ff8c00', 14);
+  const ex = player.x - e.x, ey = player.y - e.y;
+  if (Math.sqrt(ex * ex + ey * ey) <= e.exploder.radius + 10) {
+    damagePlayer(e.exploder.dmg);
+  }
+}
+
+// all damage to the player funnels here: i-frames, dodge, then armor
+function damagePlayer(raw) {
+  if (player.invincible > 0) return;
+  player.invincible = 600;
+  const st = player.stats;
+  if (Math.random() < Math.min(60, st.dodge) / 100) {
+    addFloatText(player.x, player.y - 26, 'DODGE', '#3498db');
+    Sfx.play('dodge');
+    return;
+  }
+  const dmg = Math.max(1, Math.round(raw * (1 - st.armor / (st.armor + 15))));
+  player.hp -= dmg;
+  spawnParticles(player.x, player.y, '#ff0000', 8);
+  Sfx.play('hurt');
+  if (player.hp <= 0) { player.hp = 0; gameOver(); }
 }
 
 function applyPoison(e, dps, dur) {
@@ -1427,25 +1507,52 @@ function updateEnemies(dt) {
     const dx = player.x - e.x;
     const dy = player.y - e.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > 1) {
-      e.x += (dx / dist) * e.speed * slowMult * factor;
-      e.y += (dy / dist) * e.speed * slowMult * factor;
+
+    // exploder: arm the fuse near the player, then detonate
+    if (e.exploder) {
+      if (!e.fusing && dist < e.exploder.triggerDist) {
+        e.fusing = true;
+        e.fuseT  = e.exploder.fuse;
+      }
+      if (e.fusing) {
+        e.fuseT -= dt;
+        if (e.fuseT <= 0) { selfDetonate(e); continue; }
+      }
+    }
+
+    // shooter: hold mid range and cast; everyone else chases
+    let move = 1; // toward player
+    if (e.shooter) {
+      if (dist < e.shooter.range * 0.6)      move = -0.7; // back away
+      else if (dist < e.shooter.range)       move = 0;    // hold and cast
+      e.shootT += dt;
+      if (e.shootT >= e.shooter.interval && dist < e.shooter.range * 1.3) {
+        e.shootT = 0;
+        const a = Math.atan2(dy, dx);
+        enemyBullets.push({
+          x: e.x, y: e.y,
+          vx: Math.cos(a) * e.shooter.bulletSpeed,
+          vy: Math.sin(a) * e.shooter.bulletSpeed,
+          dmg: e.shooter.dmg,
+          dist: 0,
+          dead: false,
+        });
+        Sfx.play('eshoot');
+        spawnParticles(e.x, e.y, '#9b59b6', 4);
+      }
+    }
+
+    if (dist > 1 && move !== 0) {
+      e.x += (dx / dist) * e.speed * slowMult * move * factor;
+      e.y += (dy / dist) * e.speed * slowMult * move * factor;
     }
 
     // hit player (dodge avoids it entirely; armor reduces it)
-    if (player.invincible <= 0 && rectCircle(e.x, e.y, e.w, e.h, player.x, player.y, 10)) {
-      player.invincible = 600;
-      const st = player.stats;
-      if (Math.random() < Math.min(60, st.dodge) / 100) {
-        addFloatText(player.x, player.y - 26, 'DODGE', '#3498db');
-        Sfx.play('dodge');
-      } else {
-        const dmg = Math.max(1, Math.round(e.dmg * (1 - st.armor / (st.armor + 15))));
-        player.hp -= dmg;
-        spawnParticles(player.x, player.y, '#ff0000', 8);
-        Sfx.play('hurt');
-        if (player.hp <= 0) { player.hp = 0; gameOver(); return; }
-      }
+    // exploders skip contact damage — their threat is the blast, and contact
+    // i-frames would otherwise swallow the explosion
+    if (!e.exploder && rectCircle(e.x, e.y, e.w, e.h, player.x, player.y, 10)) {
+      damagePlayer(e.dmg);
+      if (gameState !== 'playing') return;
     }
   }
   enemies = enemies.filter(e => !e.dead);
@@ -1888,6 +1995,7 @@ function render() {
   drawPotions();
   drawUpgrades();
   drawBullets();
+  drawEnemyBullets();
   drawMeleeSwings();
   drawEnemies();
   drawPlayer();
@@ -1981,6 +2089,23 @@ function drawBullets() {
   }
 }
 
+// Enemy projectiles: dark pulsing orbs
+function drawEnemyBullets() {
+  for (const b of enemyBullets) {
+    ctx.shadowColor = '#9b59b6';
+    ctx.shadowBlur  = 10;
+    ctx.fillStyle   = '#6c3483';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#d2a0e8';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+
 // Melee swing arcs
 function drawMeleeSwings() {
   for (const s of meleeSwings) {
@@ -2034,6 +2159,11 @@ function drawEnemies() {
     const flip  = player.x < e.x; // face the player
 
     if (e.hitFlash > 0) ctx.filter = 'brightness(2.5) saturate(40%)';
+    else if (e.fusing) {
+      // exploder about to blow: accelerating red strobe
+      const strobe = Math.sin(performance.now() / Math.max(20, e.fuseT / 8)) > 0;
+      if (strobe) ctx.filter = 'brightness(2.2) sepia(1) saturate(6) hue-rotate(-50deg)';
+    }
     drawSprite(frame, e.x, e.y, flip, e.scale);
     ctx.filter = 'none';
 
