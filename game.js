@@ -293,7 +293,9 @@ let rerollCost = 5;
 const HEAL_PRICE = 10;
 
 function itemPrice(item) {
-  return Math.round(item.price * (1 + (wave - 1) * 0.06)); // gets pricier as waves go
+  const waveScale = 1 + (wave - 1) * 0.06; // pricier as waves go
+  const discount  = 1 - forgeLevel('merchant') * 0.05;
+  return Math.max(1, Math.round(item.price * waveScale * discount));
 }
 let score, gold, wave, waveTimer, waveActive;
 let nextWaveDelay = 3000;
@@ -321,6 +323,7 @@ const screens = {
   gameover: document.getElementById('gameover-screen'),
   victory:  document.getElementById('victory-screen'),
   levelup:  document.getElementById('levelup-screen'),
+  forge:    document.getElementById('forge-screen'),
 };
 const hud          = document.getElementById('hud');
 const hpBar        = document.getElementById('hp-bar');
@@ -589,6 +592,73 @@ const audioBoot = () => {
 };
 document.addEventListener('pointerdown', audioBoot);
 document.addEventListener('keydown', audioBoot);
+
+// ─── Forge (permanent upgrades bought with soul gold) ────────────────────────
+const FORGE_UPGRADES = [
+  { key: 'vigor',     icon: '❤',  name: 'STARTING VIGOR',  max: 5, base: 50, fmt: l => `+${l * 10} STARTING MAX HP` },
+  { key: 'honed',     icon: '⚔',  name: 'HONED WEAPONS',   max: 5, base: 60, fmt: l => `+${l * 2}% DAMAGE` },
+  { key: 'fleet',     icon: '👢', name: 'FLEET FOOT',      max: 3, base: 55, fmt: l => `+${l * 2}% SPEED` },
+  { key: 'golden',    icon: '🪙', name: 'GOLDEN TOUCH',    max: 3, base: 70, fmt: l => `${l * 10}% CHANCE OF DOUBLE COINS` },
+  { key: 'wise',      icon: '📜', name: 'WISE SOUL',       max: 3, base: 70, fmt: l => `+${l * 10}% XP` },
+  { key: 'merchant',  icon: '🛒', name: 'MERCHANT FRIEND', max: 3, base: 80, fmt: l => `-${l * 5}% SHOP PRICES` },
+  { key: 'startgold', icon: '💰', name: 'INHERITANCE',     max: 3, base: 45, fmt: l => `START WITH +${l * 15} GOLD` },
+];
+const FORGE_RATE = 0.25; // share of run gold forged into soul gold
+
+function forgeLevel(key) { return Save.data.progress.forge[key] || 0; }
+function forgeCost(key, base) { return Math.round(base * Math.pow(1.7, forgeLevel(key))); }
+
+function refreshForgeButton() {
+  document.getElementById('forge-gold').textContent = Save.data.progress.soulGold;
+}
+
+function renderForge() {
+  document.getElementById('soul-gold').textContent = Save.data.progress.soulGold;
+  document.getElementById('forge-list').innerHTML = FORGE_UPGRADES.map(u => {
+    const lvl   = forgeLevel(u.key);
+    const maxed = lvl >= u.max;
+    const cost  = forgeCost(u.key, u.base);
+    const pips  = '◆'.repeat(lvl) + '◇'.repeat(u.max - lvl);
+    const buy   = maxed
+      ? `<button class="f-buy maxed" disabled>MAX</button>`
+      : `<button class="f-buy" data-key="${u.key}" ${Save.data.progress.soulGold < cost ? 'disabled' : ''}>${cost} ⚒</button>`;
+    return `
+      <div class="forge-row">
+        <span class="f-icon">${u.icon}</span>
+        <span class="f-info">
+          <span class="f-name">${u.name}</span>
+          <span class="f-desc">${u.fmt(Math.max(1, lvl + (maxed ? 0 : 1)))}</span>
+          <span class="f-pips">${pips}</span>
+        </span>
+        ${buy}
+      </div>`;
+  }).join('');
+}
+
+function buyForge(key) {
+  const u = FORGE_UPGRADES.find(x => x.key === key);
+  if (!u || forgeLevel(key) >= u.max) return;
+  const cost = forgeCost(key, u.base);
+  if (Save.data.progress.soulGold < cost) return;
+  Save.data.progress.soulGold -= cost;
+  Save.data.progress.forge[key] = forgeLevel(key) + 1;
+  Save.persist();
+  Sfx.play('buy');
+  renderForge();
+  refreshForgeButton();
+}
+
+document.getElementById('btn-forge').addEventListener('click', mouseOnly(() => {
+  renderForge();
+  showScreen('forge');
+}));
+document.getElementById('btn-forge-close').addEventListener('click', mouseOnly(() => showScreen('start')));
+document.getElementById('forge-list').addEventListener('click', e => {
+  if (e.detail === 0) return;
+  const btn = e.target.closest('.f-buy[data-key]');
+  if (btn) buyForge(btn.dataset.key);
+});
+refreshForgeButton();
 
 // ─── Game mode (campaign 16 waves / endless) ──────────────────────────────────
 let gameMode = Save.data.settings.mode === 'endless' ? 'endless' : 'campaign';
@@ -875,6 +945,13 @@ function startGame() {
     walkTimer: 0,
   };
 
+  // forge perks
+  player.maxHp += forgeLevel('vigor') * 10;
+  player.hp     = player.maxHp;
+  player.stats.dmgPct   += forgeLevel('honed') * 2;
+  player.stats.speedPct += forgeLevel('fleet') * 2;
+  gold += forgeLevel('startgold') * 15;
+
   hideAllScreens();
   hud.classList.remove('hidden');
   gameState = 'playing';
@@ -897,8 +974,12 @@ function gameOver() {
   Sfx.stopMusic();
   Sfx.play('gameover');
   hud.classList.add('hidden');
+  const forged = Math.round(runGoldEarned * FORGE_RATE);
+  Save.data.progress.soulGold += forged;
   const newBest = Save.recordRun(player.cls,
     { score, wave, level: player.level, won: false, kills: runKills, gold: runGoldEarned, mode: gameMode });
+  document.getElementById('final-forge').textContent = '+' + forged + ' ⚒';
+  refreshForgeButton();
   finalScore.textContent = score;
   finalWave.textContent  = wave;
   finalGold.textContent  = gold;
@@ -1394,6 +1475,7 @@ const XP_GROWTH   = 1.4;  // each level needs 40% more
 const LEVEL_HP    = 10;   // max HP gained per level (also healed)
 
 function gainXp(amount) {
+  amount = Math.round(amount * (1 + forgeLevel('wise') * 0.1));
   player.xp += amount;
   while (player.xp >= player.xpNext) {
     player.xp -= player.xpNext;
@@ -1727,7 +1809,14 @@ function updateCoins(dt) {
       c.x += (dx / dist) * pull * factor;
       c.y += (dy / dist) * pull * factor;
     }
-    if (dist < 14) { c.dead = true; gold++; runGoldEarned++; spawnParticles(c.x, c.y, '#ffd700', 4); Sfx.play('coin'); }
+    if (dist < 14) {
+      c.dead = true;
+      const doubled = Math.random() < forgeLevel('golden') * 0.1 ? 2 : 1;
+      gold          += doubled;
+      runGoldEarned += doubled;
+      spawnParticles(c.x, c.y, '#ffd700', 4);
+      Sfx.play('coin');
+    }
   }
   coins = coins.filter(c => !c.dead);
 }
@@ -1809,8 +1898,12 @@ function victory() {
   Sfx.stopMusic();
   Sfx.play('victory');
   hud.classList.add('hidden');
+  const forged = Math.round(runGoldEarned * FORGE_RATE);
+  Save.data.progress.soulGold += forged;
   const newBest = Save.recordRun(player.cls,
     { score, wave, level: player.level, won: true, kills: runKills, gold: runGoldEarned, mode: gameMode });
+  document.getElementById('victory-forge').textContent = '+' + forged + ' ⚒';
+  refreshForgeButton();
   document.getElementById('victory-score').textContent = score;
   document.getElementById('victory-gold').textContent  = gold;
   document.getElementById('new-record-victory').classList.toggle('hidden', !newBest);

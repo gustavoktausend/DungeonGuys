@@ -58,6 +58,7 @@
         <div class="mode-select">
           <button class="mode-btn selected" data-mode="campaign">⚔ CAMPAIGN — 16 WAVES</button>
           <button class="mode-btn" data-mode="endless">∞ ENDLESS</button>
+          <button id="btn-forge" class="mode-btn forge-btn">⚒ FORGE · <span id="forge-gold">0</span></button>
         </div>
         <div class="name-picker">
           <div class="color-label">— HERO NAME —</div>
@@ -106,6 +107,17 @@
       </div>
     </div>
 
+    <!-- FORGE SCREEN (permanent upgrades) -->
+    <div id="forge-screen" class="screen">
+      <div class="screen-inner compact forge-inner">
+        <div class="shop-title">⚒ FORGE</div>
+        <div class="shop-gold">SOUL GOLD <span id="soul-gold">0</span></div>
+        <div class="levelup-sub forge-hint">25% OF EACH RUN'S GOLD IS FORGED FOREVER</div>
+        <div id="forge-list" class="forge-list"></div>
+        <button id="btn-forge-close" class="btn-pixel secondary">✕ CLOSE</button>
+      </div>
+    </div>
+
     <!-- LEVEL UP SCREEN -->
     <div id="levelup-screen" class="screen">
       <div class="screen-inner compact">
@@ -143,6 +155,7 @@
           <div class="stat-row"><span>SCORE</span><span id="victory-score">0</span></div>
           <div class="stat-row"><span>WAVES</span><span>16/16</span></div>
           <div class="stat-row"><span>GOLD</span><span id="victory-gold">0</span></div>
+          <div class="stat-row"><span>FORGE</span><span id="victory-forge">+0 ⚒</span></div>
         </div>
         <button id="btn-victory-restart" class="btn-pixel">↺ PLAY AGAIN</button>
         <div class="share-row">
@@ -163,6 +176,7 @@
           <div class="stat-row"><span>WAVE</span><span id="final-wave">0</span></div>
           <div class="stat-row"><span>GOLD</span><span id="final-gold">0</span></div>
           <div class="stat-row"><span>BEST</span><span id="final-best">0</span></div>
+          <div class="stat-row"><span>FORGE</span><span id="final-forge">+0 ⚒</span></div>
         </div>
         <button id="btn-restart" class="btn-pixel">↺ PLAY AGAIN</button>
         <div class="share-row">

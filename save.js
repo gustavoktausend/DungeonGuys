@@ -10,6 +10,8 @@ const Save = (() => {
     progress: {
       runs: 0, kills: 0, goldEarned: 0, bossKills: 0, victories: 0,
       unlocked: ['mage', 'archer', 'warrior'],
+      soulGold: 0,
+      forge: {}, // upgrade key -> level
     },
   });
 
