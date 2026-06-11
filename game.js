@@ -15,9 +15,12 @@ function frames(x, y, w, h, n, stride = w) {
 }
 
 const ANIMS = {
-  wizzard:   { idle: frames(128, 164, 16, 28, 4), run: frames(192, 164, 16, 28, 4) },
-  elf:       { idle: frames(128,  36, 16, 28, 4), run: frames(192,  36, 16, 28, 4) },
-  knight:    { idle: frames(128, 100, 16, 28, 4), run: frames(192, 100, 16, 28, 4) },
+  wizzard:    { idle: frames(128, 164, 16, 28, 4), run: frames(192, 164, 16, 28, 4) },
+  elf:        { idle: frames(128,  36, 16, 28, 4), run: frames(192,  36, 16, 28, 4) },
+  knight:     { idle: frames(128, 100, 16, 28, 4), run: frames(192, 100, 16, 28, 4) },
+  wizzard_f:  { idle: frames(128, 132, 16, 28, 4), run: frames(192, 132, 16, 28, 4) },
+  masked_orc: { idle: frames(368, 153, 16, 23, 4), run: frames(432, 153, 16, 23, 4) },
+  angel:      { idle: frames(368, 304, 16, 16, 4), run: frames(432, 304, 16, 16, 4) },
   skelet:    { idle: frames(368,  88, 16, 16, 4), run: frames(432,  88, 16, 16, 4) },
   goblin:    { idle: frames(368,  40, 16, 16, 4), run: frames(432,  40, 16, 16, 4) },
   chort:     { idle: frames(368, 273, 16, 23, 4), run: frames(432, 273, 16, 23, 4) },
@@ -42,6 +45,12 @@ const WEAPON_SPRITES = {
   sword_rusty: [307,  10, 10, 21],
   sword_knight:[339,  98, 10, 29],
   sword_anime: [322,  65, 12, 30],
+  knife:       [293,  10,  6, 13],
+  machete:     [294, 105,  5, 22],
+  katana:      [293,  66,  6, 29],
+  mace:        [339,  39, 10, 24],
+  hammer:      [307,  39, 10, 24],
+  golden_sword:[291, 137, 10, 22],
   arrow:       [324, 202,  7, 21],
 };
 
@@ -73,15 +82,21 @@ let animTick = 0; // global 4-frame animation clock
 // ─── Palette swap (classic outfit recolor via RGB sliders) ───────────────────
 // each class outfit is two exact palette colors: light + its shadow
 const OUTFIT_COLORS = {
-  mage:    { light: [ 86, 152, 204], dark: [89,  86, 189] },
-  archer:  { light: [ 75, 167,  71], dark: [61, 115,  79] },
-  warrior: { light: [114, 214, 206], dark: [65, 112, 137] },
+  mage:      { light: [ 86, 152, 204], dark: [ 89,  86, 189] },
+  archer:    { light: [ 75, 167,  71], dark: [ 61, 115,  79] },
+  warrior:   { light: [114, 214, 206], dark: [ 65, 112, 137] },
+  ninja:     { light: [ 61, 115,  79], dark: [ 49,  65,  82] },
+  priestess: { light: [202, 230, 245], dark: [ 86, 152, 204] },
+  witch:     { light: [ 86, 152, 204], dark: [ 89,  86, 189] },
 };
-// strip containing idle+run+hit frames of each class on the sheet
+// strip containing idle+run(+hit) frames of each class on the sheet
 const CLASS_REGION = {
-  mage:    [128, 164, 144, 28],
-  archer:  [128,  36, 144, 28],
-  warrior: [128, 100, 144, 28],
+  mage:      [128, 164, 144, 28],
+  archer:    [128,  36, 144, 28],
+  warrior:   [128, 100, 144, 28],
+  ninja:     [368, 153, 128, 23],
+  priestess: [368, 304, 128, 16],
+  witch:     [128, 132, 144, 28],
 };
 
 let playerSheet  = SHEET;            // recolored copy used to draw the player
@@ -169,6 +184,33 @@ const CLASS_DEFS = {
       { name: 'ANIME BLADE',  sprite: 'sword_anime',  attack: 'melee', fireRate: 330, range: 84, damage: [80, 105], arc: Math.PI * 0.88, knockback: 22 },
     ],
   },
+  ninja: {
+    hp: 85, speed: 3.2, anim: 'masked_orc',
+    special: 'dash', specialCd: 5000,
+    tiers: [
+      { name: 'KNIFE',   sprite: 'knife',   attack: 'melee', fireRate: 260, range: 46, damage: [22, 32], arc: Math.PI * 0.5,  knockback: 8  },
+      { name: 'MACHETE', sprite: 'machete', attack: 'melee', fireRate: 235, range: 56, damage: [32, 44], arc: Math.PI * 0.55, knockback: 10 },
+      { name: 'KATANA',  sprite: 'katana',  attack: 'melee', fireRate: 205, range: 68, damage: [44, 60], arc: Math.PI * 0.6,  knockback: 12 },
+    ],
+  },
+  priestess: {
+    hp: 120, speed: 2.7, anim: 'angel',
+    special: 'nova', specialCd: 9000,
+    tiers: [
+      { name: 'MACE',         sprite: 'mace',         attack: 'melee', fireRate: 400, range: 56, damage: [38, 52], arc: Math.PI * 0.6,  knockback: 14 },
+      { name: 'WAR HAMMER',   sprite: 'hammer',       attack: 'melee', fireRate: 430, range: 62, damage: [55, 75], arc: Math.PI * 0.65, knockback: 18 },
+      { name: 'GOLDEN BLADE', sprite: 'golden_sword', attack: 'melee', fireRate: 360, range: 68, damage: [70, 92], arc: Math.PI * 0.7,  knockback: 18 },
+    ],
+  },
+  witch: {
+    hp: 90, speed: 2.6, anim: 'wizzard_f',
+    special: 'hex', specialCd: 9000,
+    tiers: [
+      { name: 'CURSED STAFF', sprite: 'staff',       attack: 'bolt', fireRate: 240, bulletSpeed: 7, range: 380, damage: [18, 26], pierce: 0, count: 1, poison: { dps: 8,  dur: 3000 } },
+      { name: 'VENOM STAFF',  sprite: 'staff_green', attack: 'bolt', fireRate: 210, bulletSpeed: 8, range: 420, damage: [24, 34], pierce: 1, count: 1, poison: { dps: 12, dur: 3000 } },
+      { name: 'PLAGUE STAFF', sprite: 'staff_green', attack: 'bolt', fireRate: 180, bulletSpeed: 9, range: 460, damage: [32, 44], pierce: 2, count: 1, poison: { dps: 18, dur: 4000 } },
+    ],
+  },
 };
 let selectedClass = 'mage';
 
@@ -221,11 +263,11 @@ const STAT_LABELS = {
 const PCT_STATS = new Set(['dmgPct', 'atkSpeedPct', 'speedPct', 'crit', 'dodge', 'lifeSteal', 'luck']);
 
 // ─── Shop items (4 random offers per wave; some have downsides) ───────────────
-// cls restricts the offer to one class (no dead picks)
+// dmgKind restricts the offer to classes using that damage type (no dead picks)
 const ITEM_POOL = [
-  { name: 'WHETSTONE',       icon: '🗡', price: 18, cls: 'warrior', mods: { meleeDmg: 3 } },
-  { name: 'BROADHEAD TIPS',  icon: '🏹', price: 18, cls: 'archer',  mods: { rangedDmg: 3 } },
-  { name: 'FIRE GEM',        icon: '🔥', price: 18, cls: 'mage',    mods: { elementalDmg: 3 } },
+  { name: 'WHETSTONE',       icon: '🗡', price: 18, dmgKind: 'melee',     mods: { meleeDmg: 3 } },
+  { name: 'BROADHEAD TIPS',  icon: '🏹', price: 18, dmgKind: 'arrow',     mods: { rangedDmg: 3 } },
+  { name: 'FIRE GEM',        icon: '🔥', price: 18, dmgKind: 'elemental', mods: { elementalDmg: 3 } },
   { name: 'POWER CRYSTAL',   icon: '💎', price: 30, mods: { dmgPct: 8 } },
   { name: 'SWIFT BOOTS',     icon: '👢', price: 24, mods: { speedPct: 8 } },
   { name: 'HEAVY PLATE',     icon: '🛡', price: 28, mods: { armor: 3, speedPct: -3 } },
@@ -803,6 +845,7 @@ function fireProjectile(angle, type, w) {
     damage: w.damage,
     pierce: w.pierce || 0,
     aoe: w.aoe || 0,
+    poison: w.poison || null,
     type, // 'bolt' | 'arrow' | 'fireball'
     hitIds: new Set(),
     dist: 0,
@@ -873,6 +916,52 @@ function castSpecial() {
         damage: [w.damage[0] * 1.5 | 0, w.damage[1] * 1.5 | 0],
         knockback: w.knockback * 2,
       });
+      break;
+
+    case 'dash': {
+      // shadow dash: teleport toward the aim, slicing everything on the path
+      const d  = 170;
+      const sx = player.x, sy = player.y;
+      const tx = Math.max(PLAY.left + 12,  Math.min(PLAY.right  - 12, sx + Math.cos(angle) * d));
+      const ty = Math.max(PLAY.top  + 12,  Math.min(PLAY.bottom - 12, sy + Math.sin(angle) * d));
+      const hit = new Set();
+      const steps = 10;
+      for (let i = 0; i <= steps; i++) {
+        const px2 = sx + (tx - sx) * i / steps;
+        const py2 = sy + (ty - sy) * i / steps;
+        spawnParticles(px2, py2, '#aab7c4', 3);
+        for (const e of enemies) {
+          if (e.dead || hit.has(e)) continue;
+          const ex = e.x - px2, ey = e.y - py2;
+          if (Math.sqrt(ex * ex + ey * ey) < 30 + Math.max(e.w, e.h) / 2) {
+            hit.add(e);
+            dealDamage(e, [50, 70], 'melee');
+          }
+        }
+      }
+      player.x = tx;
+      player.y = ty;
+      player.invincible = 600;
+      break;
+    }
+
+    case 'nova':
+      // holy nova: full-circle smite around the priestess + self heal
+      meleeAttack(angle, { range: 130, arc: Math.PI * 2, damage: [60, 90], knockback: 20 });
+      player.hp = Math.min(player.maxHp, player.hp + 30);
+      addFloatText(player.x, player.y - 34, '+30 HP', '#ffd700');
+      spawnParticles(player.x, player.y, '#ffd700', 24);
+      break;
+
+    case 'hex':
+      // hex: every living enemy is poisoned and slowed
+      for (const e of enemies) {
+        if (e.dead) continue;
+        applyPoison(e, 15, 4000);
+        e.slowT = Math.max(e.slowT, 4000);
+        spawnParticles(e.x, e.y, '#9b59b6', 5);
+      }
+      addFloatText(player.x, player.y - 34, 'HEX!', '#9b59b6');
       break;
   }
 }
@@ -948,6 +1037,7 @@ function updateBullets(dt) {
         }
         b.hitIds.add(e);
         dealDamage(e, b.damage, b.type, b.x, b.y);
+        if (b.poison && !e.dead) applyPoison(e, b.poison.dps, b.poison.dur);
         if (b.pierce > 0) {
           b.pierce--;
         } else {
@@ -1032,7 +1122,15 @@ function makeEnemy(type, x, y) {
     anim: def.anim,
     dead: false,
     hitFlash: 0,
+    poisonT: 0,
+    poisonDps: 0,
+    slowT: 0,
   };
+}
+
+function applyPoison(e, dps, dur) {
+  e.poisonDps = Math.max(e.poisonDps, dps);
+  e.poisonT   = Math.max(e.poisonT, dur);
 }
 
 function spawnBoss(type) {
@@ -1061,12 +1159,22 @@ function updateEnemies(dt) {
       }
     }
 
+    // poison ticks true damage; slow drags the chase
+    if (e.poisonT > 0) {
+      e.poisonT -= dt;
+      e.hp -= e.poisonDps * dt / 1000;
+      if (Math.random() < dt * 0.008) spawnParticles(e.x, e.y, '#2ecc71', 2);
+      if (e.hp <= 0) { killEnemy(e); continue; }
+    }
+    if (e.slowT > 0) e.slowT -= dt;
+    const slowMult = e.slowT > 0 ? 0.6 : 1;
+
     const dx = player.x - e.x;
     const dy = player.y - e.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist > 1) {
-      e.x += (dx / dist) * e.speed * factor;
-      e.y += (dy / dist) * e.speed * factor;
+      e.x += (dx / dist) * e.speed * slowMult * factor;
+      e.y += (dy / dist) * e.speed * slowMult * factor;
     }
 
     // hit player (dodge avoids it entirely; armor reduces it)
@@ -1240,7 +1348,9 @@ function closeShop() {
 }
 
 function rollOffers() {
-  const pool = ITEM_POOL.filter(it => !it.cls || it.cls === player.cls);
+  const atk  = player.weapon.attack; // 'melee' | 'arrow' | 'bolt'
+  const kind = atk === 'melee' ? 'melee' : atk === 'arrow' ? 'arrow' : 'elemental';
+  const pool = ITEM_POOL.filter(it => !it.dmgKind || it.dmgKind === kind);
   const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, 4);
   shopOffers = picks.map(it => ({ item: it, sold: false }));
 }

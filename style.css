@@ -161,8 +161,9 @@ html, body {
 }
 
 .class-cards {
-  display: flex;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
   justify-content: center;
 }
 
@@ -202,6 +203,9 @@ html, body {
 .mage-icon    { color: #66ccff; text-shadow: 0 0 10px #4af; }
 .archer-icon  { color: #2ecc71; text-shadow: 0 0 10px rgba(46,204,113,0.6); }
 .warrior-icon { color: #e74c3c; text-shadow: 0 0 10px rgba(231,76,60,0.6); }
+.ninja-icon   { color: #aab7c4; text-shadow: 0 0 10px rgba(170,183,196,0.6); }
+.priest-icon  { color: #ffd700; text-shadow: 0 0 10px rgba(255,215,0,0.6); }
+.witch-icon   { color: #9b59b6; text-shadow: 0 0 10px rgba(155,89,182,0.6); }
 
 .class-name {
   font-family: var(--display-font);
