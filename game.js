@@ -1622,10 +1622,13 @@ function drawHeldWeapon(p) {
     angle = s.angle - s.arc / 2 + s.arc * progress;
   }
 
-  const scale = SPRITE_SCALE / 2; // weapons read better at half sprite size
-  const dist  = 14;
-  const side  = 7;                // perpendicular shift: held in the hand, not centered
-  const handY = p.y + 10;
+  // weapons have very different sprite heights (sword 21px, staff 30px);
+  // normalize them all to the same on-screen size
+  const targetH = 16;
+  const scale   = targetH / sh;
+  const dist    = 17;
+  const side    = 12;             // perpendicular shift: held in the hand, away from the body
+  const handY   = p.y + 10;
   const ox = Math.cos(angle) * dist + Math.cos(angle + Math.PI / 2) * side;
   const oy = Math.sin(angle) * dist + Math.sin(angle + Math.PI / 2) * side;
   ctx.save();
