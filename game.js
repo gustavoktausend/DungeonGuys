@@ -70,15 +70,72 @@ let PLAY = { left: TILE, right: 0, top: TILE * 2, bottom: 0 };
 
 let animTick = 0; // global 4-frame animation clock
 
+// ─── Palette swap (classic outfit recolor via RGB sliders) ───────────────────
+// each class outfit is two exact palette colors: light + its shadow
+const OUTFIT_COLORS = {
+  mage:    { light: [ 86, 152, 204], dark: [89,  86, 189] },
+  archer:  { light: [ 75, 167,  71], dark: [61, 115,  79] },
+  warrior: { light: [114, 214, 206], dark: [65, 112, 137] },
+};
+// strip containing idle+run+hit frames of each class on the sheet
+const CLASS_REGION = {
+  mage:    [128, 164, 144, 28],
+  archer:  [128,  36, 144, 28],
+  warrior: [128, 100, 144, 28],
+};
+
+let playerSheet  = SHEET;            // recolored copy used to draw the player
+let playerColors = {};               // chosen [r,g,b] per class (persisted)
+
+try { playerColors = JSON.parse(localStorage.getItem('dg_colors')) || {}; } catch (e) {}
+
+function currentColor() {
+  return playerColors[selectedClass] || OUTFIT_COLORS[selectedClass].light;
+}
+
+const lum = ([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b;
+
+// rebuilds playerSheet swapping the outfit pair for the chosen color
+function recolorPlayerSheet() {
+  if (!SHEET.complete || SHEET.naturalWidth === 0) { playerSheet = SHEET; return; }
+  try {
+    const oc = document.createElement('canvas');
+    oc.width  = SHEET.naturalWidth;
+    oc.height = SHEET.naturalHeight;
+    const c = oc.getContext('2d');
+    c.drawImage(SHEET, 0, 0);
+
+    const { light, dark } = OUTFIT_COLORS[selectedClass];
+    const target = currentColor();
+    const shade  = lum(dark) / lum(light); // keep the original shading ratio
+    const targetDark = target.map(v => Math.round(v * shade));
+
+    const [rx, ry, rw, rh] = CLASS_REGION[selectedClass];
+    const img = c.getImageData(rx, ry, rw, rh);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] === light[0] && d[i+1] === light[1] && d[i+2] === light[2]) {
+        [d[i], d[i+1], d[i+2]] = target;
+      } else if (d[i] === dark[0] && d[i+1] === dark[1] && d[i+2] === dark[2]) {
+        [d[i], d[i+1], d[i+2]] = targetDark;
+      }
+    }
+    c.putImageData(img, rx, ry);
+    playerSheet = oc;
+  } catch (e) {
+    playerSheet = SHEET; // canvas tainted (file:// double-click) — keep defaults
+  }
+}
+
 // draws a frame centered on (x, y), optionally mirrored horizontally
-function drawSprite(frame, x, y, flip, scale = SPRITE_SCALE) {
+function drawSprite(frame, x, y, flip, scale = SPRITE_SCALE, sheet = SHEET) {
   const [sx, sy, sw, sh] = frame;
   const dw = sw * scale;
   const dh = sh * scale;
   ctx.save();
   ctx.translate(x, y);
   if (flip) ctx.scale(-1, 1);
-  ctx.drawImage(SHEET, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
+  ctx.drawImage(sheet, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
   ctx.restore();
 }
 
@@ -257,7 +314,57 @@ document.querySelectorAll('.class-card').forEach(card => {
     document.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
     card.classList.add('selected');
     selectedClass = card.dataset.class;
+    setSliders(currentColor());
+    recolorPlayerSheet();
+    drawColorPreview();
   });
+});
+
+// ─── Color picker wiring ──────────────────────────────────────────────────────
+const colorSliders = ['r', 'g', 'b'].map(ch => document.getElementById('slider-' + ch));
+const colorValues  = ['r', 'g', 'b'].map(ch => document.getElementById('val-' + ch));
+const previewCanvas = document.getElementById('color-preview');
+const pctx = previewCanvas.getContext('2d');
+let previewFrame = 0;
+
+function setSliders([r, g, b]) {
+  [r, g, b].forEach((v, i) => {
+    colorSliders[i].value = v;
+    colorValues[i].textContent = v;
+  });
+}
+
+function drawColorPreview() {
+  pctx.imageSmoothingEnabled = false;
+  pctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+  const anim = ANIMS[CLASS_DEFS[selectedClass].anim];
+  const [sx, sy, sw, sh] = anim.idle[previewFrame % 4];
+  const s = 1.7;
+  pctx.drawImage(playerSheet, sx, sy, sw, sh,
+    (previewCanvas.width - sw * s) / 2, (previewCanvas.height - sh * s) / 2, sw * s, sh * s);
+}
+
+colorSliders.forEach(sl => sl.addEventListener('input', () => {
+  const c = colorSliders.map(s => Number(s.value));
+  colorValues.forEach((el, i) => el.textContent = c[i]);
+  playerColors[selectedClass] = c;
+  try { localStorage.setItem('dg_colors', JSON.stringify(playerColors)); } catch (e) {}
+  recolorPlayerSheet();
+  drawColorPreview();
+}));
+
+// idle animation on the preview while the start screen is up
+setInterval(() => {
+  if (screens.start.classList.contains('active')) {
+    previewFrame++;
+    drawColorPreview();
+  }
+}, 250);
+
+SHEET.addEventListener('load', () => {
+  recolorPlayerSheet();
+  setSliders(currentColor());
+  drawColorPreview();
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -411,6 +518,8 @@ function startGame() {
   potions     = [];
   chests      = [];
   floatTexts  = [];
+
+  recolorPlayerSheet(); // make sure the chosen outfit color is baked in
 
   const cls = CLASS_DEFS[selectedClass];
   player = {
@@ -1488,7 +1597,7 @@ function drawPlayer() {
   const frame   = (p.moving ? animSet.run : animSet.idle)[animTick];
   const flip    = Math.cos(p.facing) < 0; // face the aim direction
 
-  drawSprite(frame, p.x, p.y, flip);
+  drawSprite(frame, p.x, p.y, flip, SPRITE_SCALE, playerSheet);
   drawHeldWeapon(p);
 
   // aim line (faint)

@@ -39,6 +39,23 @@
             </button>
           </div>
         </div>
+        <div class="color-picker">
+          <div class="color-label">— ARMOR COLOR —</div>
+          <div class="color-row">
+            <canvas id="color-preview" width="48" height="56"></canvas>
+            <div class="color-sliders">
+              <label class="cslider"><span class="ch r">R</span>
+                <input type="range" id="slider-r" min="0" max="255" value="86">
+                <span class="cval" id="val-r">86</span></label>
+              <label class="cslider"><span class="ch g">G</span>
+                <input type="range" id="slider-g" min="0" max="255" value="152">
+                <span class="cval" id="val-g">152</span></label>
+              <label class="cslider"><span class="ch b">B</span>
+                <input type="range" id="slider-b" min="0" max="255" value="204">
+                <span class="cval" id="val-b">204</span></label>
+            </div>
+          </div>
+        </div>
         <div class="instructions">
           <div class="inst-row"><span class="key">WASD</span><span>/ ARROWS — MOVE</span></div>
           <div class="inst-row"><span class="key">MOUSE</span><span>— AIM / HOLD TO ATTACK</span></div>
