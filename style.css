@@ -401,6 +401,13 @@ html, body {
 }
 .btn-pixel.secondary:hover { filter: brightness(1.25); }
 
+.share-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .btn-pixel.share {
   background: linear-gradient(180deg, #4ee07c 0%, #25d366 45%, #128c4b 100%);
   border-color: #0b5c31;
@@ -411,6 +418,17 @@ html, body {
     0 7px 10px rgba(0,0,0,0.5);
   text-shadow: 0 1px 0 rgba(200,255,220,0.45);
   font-size: clamp(14px, 2vw, 19px);
+}
+
+.btn-pixel.share.telegram {
+  background: linear-gradient(180deg, #54c8f0 0%, #229ed9 45%, #0e6e9e 100%);
+  border-color: #084d70;
+  color: #04222f;
+  box-shadow:
+    inset 0 1px 0 rgba(200,235,255,0.6),
+    0 4px 0 #084d70,
+    0 7px 10px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 0 rgba(200,235,255,0.45);
 }
 
 .footer-hint {
