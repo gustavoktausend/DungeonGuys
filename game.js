@@ -1688,7 +1688,7 @@ function drawChests() {
 
 // Floating combat text
 function drawFloatTexts() {
-  ctx.font         = '10px "Press Start 2P", monospace';
+  ctx.font         = 'bold 15px "MedievalSharp", serif';
   ctx.textAlign    = 'center';
   for (const t of floatTexts) {
     ctx.globalAlpha = Math.min(1, t.life * 1.5);
