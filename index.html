@@ -78,6 +78,20 @@
       </div>
     </div>
 
+    <!-- VICTORY SCREEN -->
+    <div id="victory-screen" class="screen">
+      <div class="screen-inner compact">
+        <div class="victory-title">DUNGEON CLEARED!</div>
+        <div class="trophy">🏆</div>
+        <div class="stats-block">
+          <div class="stat-row"><span>SCORE</span><span id="victory-score">0</span></div>
+          <div class="stat-row"><span>WAVES</span><span>16/16</span></div>
+          <div class="stat-row"><span>GOLD</span><span id="victory-gold">0</span></div>
+        </div>
+        <button id="btn-victory-restart" class="btn-pixel">↺ PLAY AGAIN</button>
+      </div>
+    </div>
+
     <!-- GAME OVER SCREEN -->
     <div id="gameover-screen" class="screen">
       <div class="screen-inner compact">
@@ -117,6 +131,12 @@
 
   <!-- Wave announcement -->
   <div id="wave-announce" class="hidden"></div>
+
+  <!-- Boss HP bar -->
+  <div id="boss-bar" class="hidden">
+    <div id="boss-name">BOSS</div>
+    <div id="boss-hp-wrap"><div id="boss-hp"></div></div>
+  </div>
 
   <canvas id="game-canvas"></canvas>
   <script src="game.js"></script>

@@ -22,6 +22,8 @@ const ANIMS = {
   goblin:    { idle: frames(368,  40, 16, 16, 4), run: frames(432,  40, 16, 16, 4) },
   chort:     { idle: frames(368, 273, 16, 23, 4), run: frames(432, 273, 16, 23, 4) },
   big_demon: { idle: frames( 16, 428, 32, 36, 4), run: frames(144, 428, 32, 36, 4) },
+  big_zombie:{ idle: frames( 16, 332, 32, 36, 4), run: frames(144, 332, 32, 36, 4) },
+  ogre:      { idle: frames( 16, 380, 32, 36, 4), run: frames(144, 380, 32, 36, 4) },
 };
 // mimic only has a 3-frame "open" anim; ping-pong it to fit the 4-frame clock
 const MIMIC_F = frames(304, 432, 16, 16, 3);
@@ -69,10 +71,10 @@ let PLAY = { left: TILE, right: 0, top: TILE * 2, bottom: 0 };
 let animTick = 0; // global 4-frame animation clock
 
 // draws a frame centered on (x, y), optionally mirrored horizontally
-function drawSprite(frame, x, y, flip) {
+function drawSprite(frame, x, y, flip, scale = SPRITE_SCALE) {
   const [sx, sy, sw, sh] = frame;
-  const dw = sw * SPRITE_SCALE;
-  const dh = sh * SPRITE_SCALE;
+  const dw = sw * scale;
+  const dh = sh * scale;
   ctx.save();
   ctx.translate(x, y);
   if (flip) ctx.scale(-1, 1);
@@ -209,6 +211,7 @@ const screens = {
   pause:    document.getElementById('pause-screen'),
   shop:     document.getElementById('shop-screen'),
   gameover: document.getElementById('gameover-screen'),
+  victory:  document.getElementById('victory-screen'),
 };
 const hud          = document.getElementById('hud');
 const hpBar        = document.getElementById('hp-bar');
@@ -238,6 +241,7 @@ document.getElementById('btn-start').addEventListener('click',   mouseOnly(start
 document.getElementById('btn-resume').addEventListener('click',  mouseOnly(resumeGame));
 document.getElementById('btn-quit').addEventListener('click',    mouseOnly(quitGame));
 document.getElementById('btn-restart').addEventListener('click', mouseOnly(startGame));
+document.getElementById('btn-victory-restart').addEventListener('click', mouseOnly(startGame));
 
 document.getElementById('btn-next-wave').addEventListener('click', mouseOnly(closeShop));
 document.getElementById('btn-shop-heal').addEventListener('click', mouseOnly(shopHeal));
@@ -466,7 +470,10 @@ function startNextWave() {
   coins   = [];
   potions = [];
   chests  = [];
-  const count = 4 + wave * 3;
+
+  const bossType = BOSS_WAVES[wave];
+  // boss waves have a smaller escort so the boss is the show
+  const count = bossType ? 8 : 4 + wave * 3;
   spawnQueue = [];
   for (let i = 0; i < count; i++) {
     spawnQueue.push({
@@ -474,8 +481,15 @@ function startNextWave() {
       type: pickEnemyType(wave),
     });
   }
-  waveDisplay.textContent = wave;
-  announceWave(`— WAVE ${wave} —`);
+
+  waveDisplay.textContent = wave + '/' + WAVES_TOTAL;
+  if (bossType) {
+    spawnBoss(bossType);
+    const name = ENEMY_DEFS[bossType].boss;
+    announceWave(wave === WAVES_TOTAL ? `☠ FINAL BOSS: ${name} ☠` : `☠ BOSS: ${name} ☠`);
+  } else {
+    announceWave(`— WAVE ${wave} —`);
+  }
 
   // a chest may appear somewhere in the arena (might be a mimic...)
   if (wave >= 2 && Math.random() < Math.min(0.95, 0.6 * (1 + player.stats.luck / 100))) {
@@ -795,15 +809,22 @@ function updateBullets(dt) {
 
 // Enemies
 const ENEMY_DEFS = {
-  skeleton: { hp: 50,  speed: 1.1, w: 26, h: 26, score: 10, gold: 1, anim: 'skelet',    potion: 0.03 },
-  goblin:   { hp: 35,  speed: 1.7, w: 24, h: 24, score: 15, gold: 2, anim: 'goblin',    potion: 0.03 },
-  demon:    { hp: 90,  speed: 0.9, w: 26, h: 40, score: 25, gold: 3, anim: 'chort',     potion: 0.08 },
-  brute:    { hp: 200, speed: 0.6, w: 52, h: 62, score: 50, gold: 6, anim: 'big_demon', potion: 0.25 },
-  mimic:    { hp: 130, speed: 1.5, w: 26, h: 24, score: 40, gold: 8, anim: 'mimic',     potion: 0.5  },
+  skeleton: { hp: 50,  speed: 1.1, w: 26, h: 26, score: 10, gold: 1, anim: 'skelet',    potion: 0.03, dmg: 8  },
+  goblin:   { hp: 35,  speed: 1.7, w: 24, h: 24, score: 15, gold: 2, anim: 'goblin',    potion: 0.03, dmg: 6  },
+  demon:    { hp: 90,  speed: 0.9, w: 26, h: 40, score: 25, gold: 3, anim: 'chort',     potion: 0.08, dmg: 10 },
+  brute:    { hp: 200, speed: 0.6, w: 52, h: 62, score: 50, gold: 6, anim: 'big_demon', potion: 0.25, dmg: 14 },
+  mimic:    { hp: 130, speed: 1.5, w: 26, h: 24, score: 40, gold: 8, anim: 'mimic',     potion: 0.5,  dmg: 10 },
+  // bosses (wave 8 and 16) — bigger sprite scale, summon minions, big loot
+  zombie_king:  { hp: 1500, speed: 0.8,  w: 76, h: 92, score: 500,  gold: 25, anim: 'big_zombie', potion: 1, dmg: 16,
+                  boss: 'ZOMBIE KING',  scale: 3, summons: ['skeleton', 'goblin'] },
+  ogre_warlord: { hp: 3200, speed: 0.9,  w: 76, h: 92, score: 1500, gold: 50, anim: 'ogre',       potion: 1, dmg: 22,
+                  boss: 'OGRE WARLORD', scale: 3, summons: ['demon', 'brute'] },
 };
 
+const WAVES_TOTAL = 16;
+const BOSS_WAVES  = { 8: 'zombie_king', 16: 'ogre_warlord' };
+
 function spawnEnemy(type) {
-  const def  = ENEMY_DEFS[type];
   const side = Math.floor(Math.random() * 4);
   let x, y;
   // spawn hugging the inside of a wall, with a puff so it reads as intentional
@@ -816,20 +837,36 @@ function spawnEnemy(type) {
   else                 { x = PLAY.left + pad; y = ry(); }
   spawnParticles(x, y, '#9b59b6', 8);
 
-  enemies.push({
+  enemies.push(makeEnemy(type, x, y));
+}
+
+function makeEnemy(type, x, y) {
+  const def = ENEMY_DEFS[type];
+  const hp  = def.hp + Math.floor(wave * def.hp * 0.12);
+  return {
     x, y,
     w: def.w, h: def.h,
-    hp: def.hp + Math.floor(wave * def.hp * 0.12),
-    maxHp: def.hp + Math.floor(wave * def.hp * 0.12),
+    hp, maxHp: hp,
     speed: def.speed + wave * 0.04,
     score: def.score,
     goldDrop: def.gold,
     potionChance: def.potion,
+    dmg: def.dmg,
+    boss: def.boss || null,
+    scale: def.scale || SPRITE_SCALE,
+    summons: def.summons || null,
+    summonTimer: 0,
     type,
     anim: def.anim,
     dead: false,
     hitFlash: 0,
-  });
+  };
+}
+
+function spawnBoss(type) {
+  const e = makeEnemy(type, canvas.width / 2, PLAY.top + 60);
+  enemies.push(e);
+  spawnParticles(e.x, e.y, '#e74c3c', 30);
 }
 
 function updateEnemies(dt) {
@@ -837,6 +874,20 @@ function updateEnemies(dt) {
   for (const e of enemies) {
     if (e.dead) continue;
     if (e.hitFlash > 0) e.hitFlash -= dt;
+
+    // bosses call reinforcements every 6s
+    if (e.boss && e.summons) {
+      e.summonTimer += dt;
+      if (e.summonTimer >= 6000) {
+        e.summonTimer = 0;
+        for (let i = 0; i < 2; i++) {
+          const minion = makeEnemy(e.summons[Math.floor(Math.random() * e.summons.length)],
+            e.x + (Math.random() - 0.5) * 80, e.y + (Math.random() - 0.5) * 80);
+          enemies.push(minion);
+          spawnParticles(minion.x, minion.y, '#9b59b6', 8);
+        }
+      }
+    }
 
     const dx = player.x - e.x;
     const dy = player.y - e.y;
@@ -853,7 +904,7 @@ function updateEnemies(dt) {
       if (Math.random() < Math.min(60, st.dodge) / 100) {
         addFloatText(player.x, player.y - 26, 'DODGE', '#3498db');
       } else {
-        const dmg = Math.max(1, Math.round(8 * (1 - st.armor / (st.armor + 15))));
+        const dmg = Math.max(1, Math.round(e.dmg * (1 - st.armor / (st.armor + 15))));
         player.hp -= dmg;
         spawnParticles(player.x, player.y, '#ff0000', 8);
         if (player.hp <= 0) { player.hp = 0; gameOver(); return; }
@@ -867,6 +918,11 @@ function killEnemy(e) {
   e.dead = true;
   score += e.score;
   spawnParticles(e.x, e.y, enemyColor(e.type), 12);
+  if (e.boss) {
+    spawnParticles(e.x, e.y, '#ffd700', 40);
+    spawnParticles(e.x, e.y, '#ff8c00', 30);
+    addFloatText(e.x, e.y - 40, e.boss + ' SLAIN!', '#ffd700');
+  }
   for (let i = 0; i < e.goldDrop; i++) {
     const angle = Math.random() * Math.PI * 2;
     const r     = Math.random() * 20;
@@ -960,6 +1016,10 @@ function checkWaveComplete() {
   const allSpawned = spawnQueue.every(s => s.spawned);
   if (allSpawned && enemies.length === 0) {
     waveActive = false;
+    if (wave >= WAVES_TOTAL) {
+      setTimeout(victory, 1200);
+      return;
+    }
     announceWave(`WAVE ${wave} CLEAR!`);
     // weapon upgrade drop every 2 waves until max tier
     if (wave % 2 === 0 && player.tier < player.def.tiers.length - 1) {
@@ -967,6 +1027,15 @@ function checkWaveComplete() {
     }
     setTimeout(openShop, 1500);
   }
+}
+
+function victory() {
+  if (gameState !== 'playing') return;
+  gameState = 'victory';
+  hud.classList.add('hidden');
+  document.getElementById('victory-score').textContent = score;
+  document.getElementById('victory-gold').textContent  = gold;
+  showScreen('victory');
 }
 
 // ─── Shop flow ────────────────────────────────────────────────────────────────
@@ -1135,21 +1204,7 @@ function lootChest(ch) {
     chests = chests.filter(c => c !== ch);
     spawnParticles(ch.x, ch.y, '#9b59b6', 14);
     addFloatText(ch.x, ch.y - 24, 'MIMIC!', '#e74c3c');
-    const def = ENEMY_DEFS.mimic;
-    enemies.push({
-      x: ch.x, y: ch.y,
-      w: def.w, h: def.h,
-      hp: def.hp + Math.floor(wave * def.hp * 0.12),
-      maxHp: def.hp + Math.floor(wave * def.hp * 0.12),
-      speed: def.speed + wave * 0.04,
-      score: def.score,
-      goldDrop: def.gold,
-      potionChance: def.potion,
-      type: 'mimic',
-      anim: 'mimic',
-      dead: false,
-      hitFlash: 0,
-    });
+    enemies.push(makeEnemy('mimic', ch.x, ch.y));
   } else if (roll < 0.6) {
     // gold burst
     const n = 6 + Math.floor(Math.random() * 5);
@@ -1230,6 +1285,17 @@ function updateHUD() {
   const staPct = player.stamina / maxStamina() * 100;
   stBar.style.width = staPct + '%';
   stBar.classList.toggle('recovering', !player.sprinting && staPct < 100);
+
+  // boss HP bar (top center)
+  const boss = enemies.find(e => e.boss && !e.dead);
+  const bossBar = document.getElementById('boss-bar');
+  if (boss) {
+    bossBar.classList.remove('hidden');
+    document.getElementById('boss-name').textContent = boss.boss;
+    document.getElementById('boss-hp').style.width = (boss.hp / boss.maxHp * 100) + '%';
+  } else {
+    bossBar.classList.add('hidden');
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1397,11 +1463,11 @@ function drawEnemies() {
     const flip  = player.x < e.x; // face the player
 
     if (e.hitFlash > 0) ctx.filter = 'brightness(2.5) saturate(40%)';
-    drawSprite(frame, e.x, e.y, flip);
+    drawSprite(frame, e.x, e.y, flip, e.scale);
     ctx.filter = 'none';
 
-    // HP bar
-    if (e.hp < e.maxHp) {
+    // HP bar (bosses use the big top bar instead)
+    if (!e.boss && e.hp < e.maxHp) {
       const bw = e.w + 6;
       const bx = e.x - bw / 2;
       const by = e.y - e.h / 2 - 9;
