@@ -425,6 +425,7 @@ function mouseOnly(fn) {
 
 document.getElementById('btn-start').addEventListener('click',   mouseOnly(startGame));
 document.getElementById('btn-resume').addEventListener('click',  mouseOnly(resumeGame));
+document.getElementById('btn-pause-restart').addEventListener('click', mouseOnly(startGame));
 document.getElementById('btn-quit').addEventListener('click',    mouseOnly(quitGame));
 document.getElementById('btn-restart').addEventListener('click', mouseOnly(startGame));
 document.getElementById('btn-victory-restart').addEventListener('click', mouseOnly(startGame));
@@ -523,6 +524,16 @@ document.querySelectorAll('.class-card').forEach(card => {
 if (UNLOCKS[selectedClass] && !Save.isUnlocked(selectedClass)) selectedClass = 'mage';
 refreshClassCards();
 refreshClassRecord();
+
+// ─── PWA: service worker + platform-specific instructions ────────────────────
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+if (window.matchMedia && matchMedia('(pointer: coarse)').matches) {
+  document.getElementById('inst-desktop').classList.add('hidden-inst');
+  document.getElementById('inst-touch').classList.remove('hidden-inst');
+}
 
 // ─── Touch controls (mobile) ──────────────────────────────────────────────────
 let touchActive = false;          // becomes true on the first touch

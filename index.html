@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>DungeonGuys — Pixel Shooter</title>
+  <meta name="theme-color" content="#150e08" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=MedievalSharp&display=swap" rel="stylesheet" />
@@ -85,13 +89,20 @@
           <button id="auto-aim-toggle" class="aim-toggle">🎯 AUTO-AIM: OFF</button>
           <button id="sound-toggle" class="aim-toggle on">🔊 SOUND: ON</button>
         </div>
-        <div class="instructions">
+        <div class="instructions" id="inst-desktop">
           <div class="inst-row"><span class="key">WASD</span><span>/ ARROWS — MOVE</span></div>
           <div class="inst-row"><span class="key">MOUSE</span><span>— AIM / HOLD TO ATTACK</span></div>
           <div class="inst-row"><span class="key">SHIFT</span><span>— SPRINT (USES STAMINA)</span></div>
           <div class="inst-row"><span class="key">E / RMB</span><span>— SPECIAL ABILITY</span></div>
           <div class="inst-row"><span class="key">ESC</span><span>— PAUSE</span></div>
           <div class="inst-row"><span class="key">GOLD</span><span>— COLLECT COINS</span></div>
+        </div>
+        <div class="instructions hidden-inst" id="inst-touch">
+          <div class="inst-row"><span class="key">🕹</span><span>LEFT SIDE — DRAG TO MOVE</span></div>
+          <div class="inst-row"><span class="key">🎯</span><span>ATTACKS AIM THE NEAREST FOE</span></div>
+          <div class="inst-row"><span class="key">✦</span><span>SPECIAL ABILITY BUTTON</span></div>
+          <div class="inst-row"><span class="key">»</span><span>HOLD TO SPRINT</span></div>
+          <div class="inst-row"><span class="key">❚❚</span><span>PAUSE</span></div>
         </div>
         <button id="btn-start" class="btn-pixel">▶ START GAME</button>
         <div class="footer-hint">Survive the waves. Collect gold. Die gloriously.</div>
@@ -103,6 +114,7 @@
       <div class="screen-inner compact">
         <div class="pause-title">— PAUSED —</div>
         <button id="btn-resume" class="btn-pixel">▶ RESUME</button>
+        <button id="btn-pause-restart" class="btn-pixel secondary">↺ RESTART</button>
         <button id="btn-quit" class="btn-pixel secondary">✕ QUIT</button>
       </div>
     </div>

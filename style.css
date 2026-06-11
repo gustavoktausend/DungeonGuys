@@ -1126,3 +1126,6 @@ html, body {
 }
 
 #gold-display { color: var(--gold-coin); text-shadow: 0 0 8px rgba(241,196,15,0.5); }
+
+/* ─── Platform-specific instructions ───────────────────── */
+.instructions.hidden-inst { display: none; }
