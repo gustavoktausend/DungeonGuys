@@ -102,9 +102,7 @@ const CLASS_REGION = {
 };
 
 let playerSheet  = SHEET;            // recolored copy used to draw the player
-let playerColors = {};               // chosen [r,g,b] per class (persisted)
-
-try { playerColors = JSON.parse(localStorage.getItem('dg_colors')) || {}; } catch (e) {}
+const playerColors = Save.data.settings.colors; // chosen [r,g,b] per class (persisted)
 
 function currentColor() {
   return playerColors[selectedClass] || OUTFIT_COLORS[selectedClass].light;
@@ -300,6 +298,7 @@ function itemPrice(item) {
 let score, gold, wave, waveTimer, waveActive;
 let nextWaveDelay = 3000;
 let spawnQueue   = [];
+let runKills = 0, runGoldEarned = 0;
 let mouse        = { x: 0, y: 0 };
 let mouseDown    = false;
 let keys         = {};
@@ -386,16 +385,56 @@ document.getElementById('shop-items').addEventListener('click', e => {
   if (btn) buyOffer(Number(btn.dataset.i));
 });
 
+// ─── Class unlocks & records ──────────────────────────────────────────────────
+const UNLOCKS = {
+  ninja:     'REACH WAVE 6',
+  priestess: 'SLAY THE ZOMBIE KING',
+  witch:     'REACH LEVEL 8',
+};
+
+function refreshClassCards() {
+  document.querySelectorAll('.class-card').forEach(card => {
+    const cls    = card.dataset.class;
+    const desc   = card.querySelector('.class-desc');
+    if (!desc.dataset.original) desc.dataset.original = desc.innerHTML;
+    const locked = !!UNLOCKS[cls] && !Save.isUnlocked(cls);
+    card.classList.toggle('locked', locked);
+    desc.innerHTML = locked ? '🔒 ' + UNLOCKS[cls] : desc.dataset.original;
+  });
+}
+
+function refreshClassRecord() {
+  const r  = Save.classRecord(selectedClass);
+  const el = document.getElementById('class-record');
+  el.textContent = r
+    ? `BEST · WAVE ${r.wave} · LV ${r.level} · ${r.score} PTS` + (r.victories ? ` · ${r.victories}🏆` : '')
+    : 'NO RUNS YET';
+}
+
+function tryUnlock(cls) {
+  if (!Save.unlock(cls)) return;
+  announceWave(cls.toUpperCase() + ' UNLOCKED!');
+  Sfx.play('victory');
+  refreshClassCards();
+}
+
 document.querySelectorAll('.class-card').forEach(card => {
   card.addEventListener('click', () => {
+    if (card.classList.contains('locked')) return;
     document.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
     card.classList.add('selected');
     selectedClass = card.dataset.class;
     setSliders(currentColor());
     recolorPlayerSheet();
     drawColorPreview();
+    refreshClassRecord();
   });
 });
+
+// a previously selected class may be locked on a fresh save
+if (UNLOCKS[selectedClass] && !Save.isUnlocked(selectedClass)) selectedClass = 'mage';
+refreshClassCards();
+refreshClassRecord();
 
 // ─── Touch controls (mobile) ──────────────────────────────────────────────────
 let touchActive = false;          // becomes true on the first touch
@@ -476,8 +515,7 @@ function setupTouchControls() {
 }
 
 // ─── Auto-aim ─────────────────────────────────────────────────────────────────
-let autoAim = false;
-try { autoAim = localStorage.getItem('dg_autoaim') === '1'; } catch (e) {}
+let autoAim = Save.data.settings.autoAim;
 
 const aimToggle = document.getElementById('auto-aim-toggle');
 function refreshAimToggle() {
@@ -486,7 +524,8 @@ function refreshAimToggle() {
 }
 aimToggle.addEventListener('click', () => {
   autoAim = !autoAim;
-  try { localStorage.setItem('dg_autoaim', autoAim ? '1' : '0'); } catch (e) {}
+  Save.data.settings.autoAim = autoAim;
+  Save.persist();
   refreshAimToggle();
 });
 refreshAimToggle();
@@ -512,8 +551,7 @@ function aimAngle() {
 }
 
 // ─── Sound ────────────────────────────────────────────────────────────────────
-let soundMuted = false;
-try { soundMuted = localStorage.getItem('dg_mute') === '1'; } catch (e) {}
+let soundMuted = Save.data.settings.mute;
 Sfx.setMuted(soundMuted);
 
 const soundToggle = document.getElementById('sound-toggle');
@@ -523,7 +561,8 @@ function refreshSoundToggle() {
 }
 function toggleSound() {
   soundMuted = !soundMuted;
-  try { localStorage.setItem('dg_mute', soundMuted ? '1' : '0'); } catch (e) {}
+  Save.data.settings.mute = soundMuted;
+  Save.persist();
   Sfx.setMuted(soundMuted);
   refreshSoundToggle();
 }
@@ -542,9 +581,10 @@ document.addEventListener('keydown', audioBoot);
 
 // ─── Hero name ────────────────────────────────────────────────────────────────
 const nameInput = document.getElementById('hero-name');
-try { nameInput.value = localStorage.getItem('dg_name') || ''; } catch (e) {}
+nameInput.value = Save.data.settings.name;
 nameInput.addEventListener('input', () => {
-  try { localStorage.setItem('dg_name', nameInput.value); } catch (e) {}
+  Save.data.settings.name = nameInput.value;
+  Save.persist();
 });
 
 function heroName() {
@@ -580,7 +620,7 @@ colorSliders.forEach(sl => sl.addEventListener('input', () => {
   const c = colorSliders.map(s => Number(s.value));
   colorValues.forEach((el, i) => el.textContent = c[i]);
   playerColors[selectedClass] = c;
-  try { localStorage.setItem('dg_colors', JSON.stringify(playerColors)); } catch (e) {}
+  Save.persist();
   recolorPlayerSheet();
   drawColorPreview();
 }));
@@ -762,6 +802,8 @@ function startGame() {
   floatTexts  = [];
   pendingLevelUps     = 0;
   pendingAfterLevelUp = null;
+  runKills      = 0;
+  runGoldEarned = 0;
 
   recolorPlayerSheet(); // make sure the chosen outfit color is baked in
 
@@ -814,9 +856,14 @@ function gameOver() {
   Sfx.stopMusic();
   Sfx.play('gameover');
   hud.classList.add('hidden');
+  const newBest = Save.recordRun(player.cls,
+    { score, wave, level: player.level, won: false, kills: runKills, gold: runGoldEarned });
   finalScore.textContent = score;
   finalWave.textContent  = wave;
   finalGold.textContent  = gold;
+  document.getElementById('final-best').textContent = Save.classRecord(player.cls).score;
+  document.getElementById('new-record').classList.toggle('hidden', !newBest);
+  refreshClassRecord();
   showScreen('gameover');
 }
 
@@ -844,6 +891,7 @@ function startNextWave() {
     });
   }
 
+  if (wave >= 6) tryUnlock('ninja');
   waveDisplay.textContent = wave + '/' + WAVES_TOTAL;
   if (bossType) {
     Sfx.play('bosshorn');
@@ -1302,6 +1350,7 @@ function gainXp(amount) {
     player.maxHp += LEVEL_HP;
     player.hp = Math.min(player.maxHp, player.hp + LEVEL_HP);
     pendingLevelUps++;
+    if (player.level >= 8) tryUnlock('witch');
     addFloatText(player.x, player.y - 34, 'LEVEL UP!', '#66ccff');
     Sfx.play('levelup');
     spawnParticles(player.x, player.y, '#66ccff', 16);
@@ -1561,8 +1610,14 @@ function updateEnemies(dt) {
 function killEnemy(e) {
   e.dead = true;
   score += e.score;
+  runKills++;
   gainXp(e.score); // xp mirrors score value
   Sfx.play(e.boss ? 'explosion' : 'death');
+  if (e.boss) {
+    Save.data.progress.bossKills++;
+    Save.persist();
+    if (e.type === 'zombie_king') tryUnlock('priestess');
+  }
   spawnParticles(e.x, e.y, enemyColor(e.type), 12);
   if (e.boss) {
     spawnParticles(e.x, e.y, '#ffd700', 40);
@@ -1611,7 +1666,7 @@ function updateCoins(dt) {
       c.x += (dx / dist) * pull * factor;
       c.y += (dy / dist) * pull * factor;
     }
-    if (dist < 14) { c.dead = true; gold++; spawnParticles(c.x, c.y, '#ffd700', 4); Sfx.play('coin'); }
+    if (dist < 14) { c.dead = true; gold++; runGoldEarned++; spawnParticles(c.x, c.y, '#ffd700', 4); Sfx.play('coin'); }
   }
   coins = coins.filter(c => !c.dead);
 }
@@ -1693,8 +1748,12 @@ function victory() {
   Sfx.stopMusic();
   Sfx.play('victory');
   hud.classList.add('hidden');
+  const newBest = Save.recordRun(player.cls,
+    { score, wave, level: player.level, won: true, kills: runKills, gold: runGoldEarned });
   document.getElementById('victory-score').textContent = score;
   document.getElementById('victory-gold').textContent  = gold;
+  document.getElementById('new-record-victory').classList.toggle('hidden', !newBest);
+  refreshClassRecord();
   showScreen('victory');
 }
 

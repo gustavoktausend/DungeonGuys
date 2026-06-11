@@ -223,6 +223,30 @@ html, body {
   letter-spacing: 0.06em;
 }
 
+.class-card.locked {
+  filter: grayscale(1) brightness(0.6);
+  cursor: not-allowed;
+}
+.class-card.locked:hover { transform: none; border-color: var(--bronze); }
+.class-card.locked .class-desc { color: rgba(232,160,120,0.85); }
+
+#class-record {
+  font-size: clamp(11px, 1.5vw, 14px);
+  color: rgba(201,162,39,0.75);
+  letter-spacing: 0.12em;
+  margin-top: 4px;
+}
+
+.new-record {
+  font-family: var(--display-font);
+  font-size: clamp(16px, 2.6vw, 24px);
+  color: var(--gold-coin);
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 16px rgba(241,196,15,0.9);
+  animation: pulse-gold 1.2s ease-in-out infinite;
+}
+.new-record.hidden { display: none; }
+
 /* ─── Name Picker ──────────────────────────────────────── */
 .name-picker {
   display: flex;

@@ -53,6 +53,7 @@
               <span class="class-desc">POISON BOLTS<br>HEX CURSE</span>
             </button>
           </div>
+          <div id="class-record">NO RUNS YET</div>
         </div>
         <div class="name-picker">
           <div class="color-label">— HERO NAME —</div>
@@ -133,6 +134,7 @@
       <div class="screen-inner compact">
         <div class="victory-title">DUNGEON CLEARED!</div>
         <div class="trophy">🏆</div>
+        <div id="new-record-victory" class="new-record hidden">★ NEW RECORD ★</div>
         <div class="stats-block">
           <div class="stat-row"><span>SCORE</span><span id="victory-score">0</span></div>
           <div class="stat-row"><span>WAVES</span><span>16/16</span></div>
@@ -151,10 +153,12 @@
       <div class="screen-inner compact">
         <div class="gameover-title">YOU DIED</div>
         <div class="skull">☠</div>
+        <div id="new-record" class="new-record hidden">★ NEW RECORD ★</div>
         <div class="stats-block">
           <div class="stat-row"><span>SCORE</span><span id="final-score">0</span></div>
           <div class="stat-row"><span>WAVE</span><span id="final-wave">0</span></div>
           <div class="stat-row"><span>GOLD</span><span id="final-gold">0</span></div>
+          <div class="stat-row"><span>BEST</span><span id="final-best">0</span></div>
         </div>
         <button id="btn-restart" class="btn-pixel">↺ PLAY AGAIN</button>
         <div class="share-row">
@@ -209,6 +213,7 @@
   </div>
 
   <canvas id="game-canvas"></canvas>
+  <script src="save.js"></script>
   <script src="audio.js"></script>
   <script src="game.js"></script>
 </body>
