@@ -388,6 +388,84 @@ document.querySelectorAll('.class-card').forEach(card => {
   });
 });
 
+// ─── Touch controls (mobile) ──────────────────────────────────────────────────
+let touchActive = false;          // becomes true on the first touch
+let joyTouchId  = null;
+let joyOrigin   = { x: 0, y: 0 };
+let touchVec    = { x: 0, y: 0 }; // analog movement vector, magnitude 0..1
+const JOY_RADIUS = 58;
+
+const touchUi  = document.getElementById('touch-ui');
+const joyBase  = document.getElementById('joystick-base');
+const joyKnob  = document.getElementById('joystick-knob');
+
+function enableTouchUi() {
+  if (touchActive) return;
+  touchActive = true;
+  touchUi.classList.add('enabled');
+}
+
+function setupTouchControls() {
+  canvas.addEventListener('touchstart', e => {
+    enableTouchUi();
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (joyTouchId === null && t.clientX < window.innerWidth * 0.55) {
+        joyTouchId = t.identifier;
+        joyOrigin = { x: t.clientX, y: t.clientY };
+        joyBase.style.left = t.clientX + 'px';
+        joyBase.style.top  = t.clientY + 'px';
+        joyBase.style.display = 'block';
+        joyKnob.style.transform = 'translate(-50%, -50%)';
+      }
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier !== joyTouchId) continue;
+      let dx = t.clientX - joyOrigin.x;
+      let dy = t.clientY - joyOrigin.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len > JOY_RADIUS) { dx = dx / len * JOY_RADIUS; dy = dy / len * JOY_RADIUS; }
+      touchVec = { x: dx / JOY_RADIUS, y: dy / JOY_RADIUS };
+      joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    }
+  }, { passive: false });
+
+  const endTouch = e => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== joyTouchId) continue;
+      joyTouchId = null;
+      touchVec = { x: 0, y: 0 };
+      joyBase.style.display = 'none';
+    }
+  };
+  canvas.addEventListener('touchend',    endTouch);
+  canvas.addEventListener('touchcancel', endTouch);
+
+  // action buttons
+  const specialBtn = document.getElementById('btn-touch-special');
+  const sprintBtn  = document.getElementById('btn-touch-sprint');
+  const pauseBtn   = document.getElementById('btn-touch-pause');
+
+  specialBtn.addEventListener('touchstart', e => { e.preventDefault(); castSpecial(); }, { passive: false });
+  sprintBtn.addEventListener('touchstart',  e => {
+    e.preventDefault();
+    keys['ShiftLeft'] = true;
+    sprintBtn.classList.add('held');
+  }, { passive: false });
+  const sprintEnd = () => { keys['ShiftLeft'] = false; sprintBtn.classList.remove('held'); };
+  sprintBtn.addEventListener('touchend',    sprintEnd);
+  sprintBtn.addEventListener('touchcancel', sprintEnd);
+  pauseBtn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (gameState === 'playing') pauseGame();
+    else if (gameState === 'paused') resumeGame();
+  }, { passive: false });
+}
+
 // ─── Auto-aim ─────────────────────────────────────────────────────────────────
 let autoAim = false;
 try { autoAim = localStorage.getItem('dg_autoaim') === '1'; } catch (e) {}
@@ -414,9 +492,10 @@ function nearestEnemy() {
   return best;
 }
 
-// where the player is aiming: nearest enemy when auto-aim is on, else the mouse
+// where the player is aiming: nearest enemy when auto-aim is on (always on for
+// touch — there's no mouse to aim with), else the mouse
 function aimAngle() {
-  if (autoAim) {
+  if (autoAim || touchActive) {
     const t = nearestEnemy();
     if (t) return Math.atan2(t.y - player.y, t.x - player.x);
   }
@@ -502,6 +581,9 @@ window.addEventListener('load', () => {
   });
   window.addEventListener('mouseup',   e => { if (e.button === 0) mouseDown = false; });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
+  setupTouchControls();
+  // coarse pointer (phone/tablet): enable the touch UI upfront
+  if (window.matchMedia && matchMedia('(pointer: coarse)').matches) enableTouchUi();
   showScreen('start');
 });
 
@@ -801,10 +883,16 @@ function updatePlayer(dt) {
   if (keys['KeyA'] || keys['ArrowLeft'])  dx -= 1;
   if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
 
-  p.moving = (dx !== 0 || dy !== 0);
-  if (p.moving) {
+  if (dx !== 0 || dy !== 0) {
     const len = Math.sqrt(dx*dx + dy*dy);
     dx /= len; dy /= len;
+  } else if (Math.abs(touchVec.x) > 0.12 || Math.abs(touchVec.y) > 0.12) {
+    dx = touchVec.x; // analog: keeps the joystick's partial magnitude
+    dy = touchVec.y;
+  }
+
+  p.moving = (dx !== 0 || dy !== 0);
+  if (p.moving) {
     p.walkTimer += dt;
     if (p.walkTimer > 120) { p.walkFrame = (p.walkFrame + 1) % 4; p.walkTimer = 0; }
   }
@@ -840,8 +928,8 @@ function updatePlayer(dt) {
   // face toward the current aim (mouse, or nearest enemy with auto-aim)
   p.facing = aimAngle();
 
-  // auto-fire on hold (mouse or keys)
-  if (mouseDown || keys['Space'] || keys['KeyZ']) {
+  // auto-fire on hold (mouse or keys); touch always auto-attacks when enemies exist
+  if (mouseDown || keys['Space'] || keys['KeyZ'] || (touchActive && enemies.length > 0)) {
     attack();
   }
 }

@@ -39,6 +39,7 @@ html, body {
   width: 100%; height: 100%;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  touch-action: none; /* no scroll/zoom gestures over the game */
 }
 
 /* ─── UI Overlay ───────────────────────────────────────── */
@@ -724,6 +725,75 @@ html, body {
   width: 100%;
   background: linear-gradient(to right, #7b241c, #e74c3c);
   transition: width 0.2s ease;
+}
+
+/* ─── Touch Controls (mobile) ──────────────────────────── */
+#touch-ui { display: none; }
+#touch-ui.enabled { display: block; }
+#hud.hidden + #touch-ui { display: none; } /* only during gameplay */
+
+#joystick-base {
+  position: fixed;
+  width: 116px;
+  height: 116px;
+  border: 3px solid rgba(201,162,39,0.5);
+  border-radius: 50%;
+  background: rgba(20,14,8,0.35);
+  transform: translate(-50%, -50%);
+  display: none;
+  z-index: 7;
+  pointer-events: none;
+}
+
+#joystick-knob {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 60%, #8a6a2f);
+  border: 2px solid #4a3018;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+}
+
+#btn-touch-special, #btn-touch-sprint, #btn-touch-pause {
+  position: fixed;
+  z-index: 7;
+  font-family: var(--display-font);
+  border-radius: 50%;
+  border: 3px solid var(--bronze);
+  background: rgba(20,14,8,0.55);
+  color: var(--gold-light);
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#btn-touch-special {
+  right: 24px; bottom: 36px;
+  width: 84px; height: 84px;
+  font-size: 34px;
+  color: #d2a0e8;
+  border-color: #6c3483;
+  box-shadow: 0 0 16px rgba(155,89,182,0.35);
+}
+
+#btn-touch-sprint {
+  right: 122px; bottom: 24px;
+  width: 64px; height: 64px;
+  font-size: 28px;
+  color: var(--gold-coin);
+}
+
+#btn-touch-sprint.held {
+  background: rgba(201,162,39,0.4);
+}
+
+#btn-touch-pause {
+  right: 12px; top: 76px;
+  width: 44px; height: 44px;
+  font-size: 14px;
 }
 
 /* ─── Wave Announce ────────────────────────────────────── */
