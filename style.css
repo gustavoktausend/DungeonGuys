@@ -777,6 +777,26 @@ html, body {
   transition: width 0.2s ease;
 }
 
+/* ─── Hurt flash ───────────────────────────────────────── */
+#hurt-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    transparent 40%, rgba(192, 57, 43, 0.45) 100%);
+  opacity: 0;
+}
+
+#hurt-flash.show {
+  animation: hurt-fade 0.4s ease-out forwards;
+}
+
+@keyframes hurt-fade {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* ─── Touch Controls (mobile) ──────────────────────────── */
 #touch-ui { display: none; }
 #touch-ui.enabled { display: block; }

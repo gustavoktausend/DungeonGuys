@@ -299,6 +299,12 @@ let score, gold, wave, waveTimer, waveActive;
 let nextWaveDelay = 3000;
 let spawnQueue   = [];
 let runKills = 0, runGoldEarned = 0;
+let shakeT = 0, shakeMag = 0; // screen shake timer/magnitude
+
+function addShake(mag, dur = 220) {
+  shakeMag = Math.max(shakeMag, mag);
+  shakeT   = Math.max(shakeT, dur);
+}
 let mouse        = { x: 0, y: 0 };
 let mouseDown    = false;
 let keys         = {};
@@ -954,6 +960,7 @@ function loop(ts) {
 
 // ─── Update ───────────────────────────────────────────────────────────────────
 function update(dt) {
+  if (shakeT > 0) { shakeT -= dt; if (shakeT <= 0) shakeMag = 0; }
   updatePlayer(dt);
   updateBullets(dt);
   updateEnemyBullets(dt);
@@ -1203,6 +1210,7 @@ function castSpecial() {
 
 function explode(b) {
   Sfx.play('explosion');
+  addShake(7, 280);
   spawnParticles(b.x, b.y, '#ff8c00', 24);
   spawnParticles(b.x, b.y, '#ffe066', 16);
   for (const e of enemies) {
@@ -1232,6 +1240,9 @@ function dealDamage(e, [min, max], kind, fx, fy) {
   if (Math.random() < st.crit / 100) {
     dmg *= 2;
     addFloatText(e.x, e.y - e.h / 2 - 12, dmg + '!', '#f1c40f');
+  } else {
+    // every hit shows its number, slightly scattered so stacks stay readable
+    addFloatText(e.x + (Math.random() - 0.5) * 14, e.y - e.h / 2 - 8, dmg, '#e8dcc8');
   }
 
   e.hp -= dmg;
@@ -1487,6 +1498,7 @@ function makeEnemy(type, x, y) {
 function selfDetonate(e) {
   e.dead = true;
   Sfx.play('explosion');
+  addShake(7, 280);
   spawnParticles(e.x, e.y, '#2ecc71', 20);
   spawnParticles(e.x, e.y, '#ff8c00', 14);
   const ex = player.x - e.x, ey = player.y - e.y;
@@ -1508,6 +1520,12 @@ function damagePlayer(raw) {
   const dmg = Math.max(1, Math.round(raw * (1 - st.armor / (st.armor + 15))));
   player.hp -= dmg;
   spawnParticles(player.x, player.y, '#ff0000', 8);
+  addFloatText(player.x, player.y - 30, '-' + dmg, '#e74c3c');
+  addShake(6);
+  const flash = document.getElementById('hurt-flash');
+  flash.classList.remove('show');
+  void flash.offsetWidth;
+  flash.classList.add('show');
   Sfx.play('hurt');
   if (player.hp <= 0) { player.hp = 0; gameOver(); }
 }
@@ -1614,6 +1632,7 @@ function killEnemy(e) {
   gainXp(e.score); // xp mirrors score value
   Sfx.play(e.boss ? 'explosion' : 'death');
   if (e.boss) {
+    addShake(14, 500);
     Save.data.progress.bossKills++;
     Save.persist();
     if (e.type === 'zombie_king') tryUnlock('priestess');
@@ -2047,6 +2066,11 @@ function rectCircle(rx, ry, rw, rh, cx, cy, cr) {
 function render() {
   animTick = Math.floor(performance.now() / 140) % 4;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  if (shakeT > 0) {
+    const f = shakeT / 220; // fades out
+    ctx.translate((Math.random() - 0.5) * shakeMag * f, (Math.random() - 0.5) * shakeMag * f);
+  }
   drawTiles();
   drawTorches();
   drawChests();
@@ -2060,6 +2084,7 @@ function render() {
   drawPlayer();
   drawParticles();
   drawFloatTexts();
+  ctx.restore(); // shake transform
 }
 
 // Tiles
