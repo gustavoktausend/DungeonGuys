@@ -309,10 +309,10 @@ const GAME_URL = 'https://gustavoktausend.github.io/DungeonGuys/';
 
 function shareMessage(won) {
   return won
-    ? `🏆 ${player.name} conquistou a masmorra! Zerei o Dungeon Crawler no nível ${player.level} ` +
+    ? `🏆 ${player.name} conquistou a masmorra! Zerei o DungeonGuys no nível ${player.level} ` +
       `com ${score} pontos! Consegue igualar? ⚔️`
     : `⚔️ ${player.name} lutou até a wave ${wave}/${WAVES_TOTAL} e caiu no nível ${player.level}, ` +
-      `com ${score} pontos no Dungeon Crawler! Consegue me superar?`;
+      `com ${score} pontos no DungeonGuys! Consegue me superar?`;
 }
 
 function shareWhatsApp(won) {
