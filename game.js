@@ -1420,6 +1420,86 @@ function updateBullets(dt) {
   bullets = bullets.filter(b => !b.dead);
 }
 
+// ─── Boss attack patterns ─────────────────────────────────────────────────────
+// returns true while the pattern controls the boss's movement
+function updateBossPattern(e, dt, dx, dy, dist, factor) {
+  if (!e.abilities) return false;
+
+  // enrage below 30% HP: faster, angrier, shorter cooldowns
+  if (!e.enraged && e.hp < e.maxHp * 0.3) {
+    e.enraged = true;
+    e.speed *= 1.35;
+    addFloatText(e.x, e.y - e.h / 2 - 16, 'ENRAGED!', '#e74c3c');
+    Sfx.play('mimic');
+    spawnParticles(e.x, e.y, '#e74c3c', 18);
+  }
+  const cdMult = e.enraged ? 0.6 : 1;
+
+  if (e.bossState === 'telegraph') {
+    e.stateT -= dt;
+    if (e.stateT <= 0) {
+      e.bossState = 'charging';
+      e.stateT = 520;
+      Sfx.play('special');
+    }
+    return true; // planted, winding up
+  }
+
+  if (e.bossState === 'charging') {
+    e.stateT -= dt;
+    const sp = e.speed * 7;
+    e.x += e.chargeDir.x * sp * factor;
+    e.y += e.chargeDir.y * sp * factor;
+    // slamming into a wall ends the charge early
+    const cx = Math.max(PLAY.left + 24, Math.min(PLAY.right  - 24, e.x));
+    const cy = Math.max(PLAY.top  + 24, Math.min(PLAY.bottom - 24, e.y));
+    if (cx !== e.x || cy !== e.y) {
+      e.x = cx; e.y = cy;
+      e.stateT = 0;
+      addShake(9, 260);
+      Sfx.play('explosion');
+      spawnParticles(e.x, e.y, '#aab7c4', 14);
+    }
+    if (e.stateT <= 0) { e.bossState = 'recover'; e.stateT = 450; }
+    return true;
+  }
+
+  if (e.bossState === 'recover') {
+    e.stateT -= dt;
+    if (e.stateT <= 0) e.bossState = 'chase';
+    return true;
+  }
+
+  // chasing: tick cooldowns and maybe start an ability
+  for (const k of Object.keys(e.abilities)) e.cd[k] = (e.cd[k] || 0) + dt;
+
+  if (e.abilities.ring && e.cd.ring >= e.abilities.ring * cdMult && dist < 420) {
+    e.cd.ring = 0;
+    const n = e.enraged ? 16 : 12;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      enemyBullets.push({
+        x: e.x, y: e.y,
+        vx: Math.cos(a) * 3.8, vy: Math.sin(a) * 3.8,
+        dmg: 12, dist: 0, dead: false,
+      });
+    }
+    Sfx.play('eshoot');
+    spawnParticles(e.x, e.y, '#9b59b6', 16);
+    return false;
+  }
+
+  if (e.abilities.charge && e.cd.charge >= e.abilities.charge * cdMult && dist > 120 && dist < 520) {
+    e.cd.charge   = 0;
+    e.bossState   = 'telegraph';
+    e.stateT      = 650;
+    e.chargeDir   = { x: dx / dist, y: dy / dist }; // locked now — sidestep it!
+    Sfx.play('mimic');
+    return true;
+  }
+  return false;
+}
+
 // Enemy projectiles (necromancer bolts)
 function updateEnemyBullets(dt) {
   const factor = dt / 16.67;
@@ -1460,9 +1540,11 @@ const ENEMY_DEFS = {
                  exploder: { fuse: 700, radius: 90, dmg: 18, triggerDist: 55 } },
   // bosses (wave 8 and 16) — bigger sprite scale, summon minions, big loot
   zombie_king:  { hp: 1500, speed: 0.8,  w: 76, h: 92, score: 500,  gold: 25, anim: 'big_zombie', potion: 1, dmg: 16,
-                  boss: 'ZOMBIE KING',  scale: 3, summons: ['skeleton', 'goblin'] },
+                  boss: 'ZOMBIE KING',  scale: 3, summons: ['skeleton', 'goblin'],
+                  abilities: { charge: 6500 } },
   ogre_warlord: { hp: 3200, speed: 0.9,  w: 76, h: 92, score: 1500, gold: 50, anim: 'ogre',       potion: 1, dmg: 22,
-                  boss: 'OGRE WARLORD', scale: 3, summons: ['demon', 'brute'] },
+                  boss: 'OGRE WARLORD', scale: 3, summons: ['demon', 'brute'],
+                  abilities: { charge: 8000, ring: 7000 } },
 };
 
 const WAVES_TOTAL   = 16;
@@ -1614,6 +1696,12 @@ function makeEnemy(type, x, y) {
     exploder: def.exploder || null,
     fusing: false,
     fuseT: 0,
+    abilities: def.abilities || null,
+    cd: {},
+    bossState: 'chase',
+    stateT: 0,
+    chargeDir: { x: 0, y: 0 },
+    enraged: false,
   };
 }
 
@@ -1733,7 +1821,9 @@ function updateEnemies(dt) {
       }
     }
 
-    if (dist > 1 && move !== 0) {
+    const bossBusy = e.boss ? updateBossPattern(e, dt, dx, dy, dist, factor) : false;
+
+    if (!bossBusy && dist > 1 && move !== 0) {
       e.x += (dx / dist) * e.speed * slowMult * move * factor;
       e.y += (dy / dist) * e.speed * slowMult * move * factor;
     }
@@ -1742,7 +1832,7 @@ function updateEnemies(dt) {
     // exploders skip contact damage — their threat is the blast, and contact
     // i-frames would otherwise swallow the explosion
     if (!e.exploder && rectCircle(e.x, e.y, e.w, e.h, player.x, player.y, 10)) {
-      damagePlayer(e.dmg);
+      damagePlayer(e.bossState === 'charging' ? Math.round(e.dmg * 1.5) : e.dmg);
       if (gameState !== 'playing') return;
     }
   }
@@ -2218,6 +2308,7 @@ function render() {
   drawBullets();
   drawEnemyBullets();
   drawMeleeSwings();
+  drawBossTelegraphs();
   drawEnemies();
   drawPlayer();
   drawParticles();
@@ -2311,6 +2402,24 @@ function drawBullets() {
   }
 }
 
+// charge telegraph: red warning lane in front of the boss
+function drawBossTelegraphs() {
+  for (const e of enemies) {
+    if (e.dead || e.bossState !== 'telegraph') continue;
+    const len   = 360;
+    const pulse = 0.18 + Math.abs(Math.sin(performance.now() / 90)) * 0.16;
+    ctx.save();
+    ctx.strokeStyle = `rgba(231, 76, 60, ${pulse})`;
+    ctx.lineWidth   = e.w * 0.9;
+    ctx.lineCap     = 'round';
+    ctx.beginPath();
+    ctx.moveTo(e.x, e.y);
+    ctx.lineTo(e.x + e.chargeDir.x * len, e.y + e.chargeDir.y * len);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 // Enemy projectiles: dark pulsing orbs
 function drawEnemyBullets() {
   for (const b of enemyBullets) {
@@ -2381,6 +2490,9 @@ function drawEnemies() {
     const flip  = player.x < e.x; // face the player
 
     if (e.hitFlash > 0) ctx.filter = 'brightness(2.5) saturate(40%)';
+    else if (e.enraged) {
+      ctx.filter = `saturate(2.2) hue-rotate(-25deg) brightness(${(1.15 + Math.sin(performance.now() / 90) * 0.15).toFixed(2)})`;
+    }
     else if (e.fusing) {
       // exploder about to blow: accelerating red strobe
       const strobe = Math.sin(performance.now() / Math.max(20, e.fuseT / 8)) > 0;
