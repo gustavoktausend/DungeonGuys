@@ -327,7 +327,7 @@ const finalGold    = document.getElementById('final-gold');
 // buttons drop focus after click so Space (attack key) never re-activates them
 document.addEventListener('click', e => {
   const btn = e.target.closest('button');
-  if (btn) btn.blur();
+  if (btn) { btn.blur(); Sfx.play('click'); }
 });
 
 // keyboard-triggered clicks (Space/Enter on a focused button) have detail === 0;
@@ -502,6 +502,35 @@ function aimAngle() {
   return Math.atan2(mouse.y - player.y, mouse.x - player.x);
 }
 
+// ─── Sound ────────────────────────────────────────────────────────────────────
+let soundMuted = false;
+try { soundMuted = localStorage.getItem('dg_mute') === '1'; } catch (e) {}
+Sfx.setMuted(soundMuted);
+
+const soundToggle = document.getElementById('sound-toggle');
+function refreshSoundToggle() {
+  soundToggle.textContent = (soundMuted ? '🔇' : '🔊') + ' SOUND: ' + (soundMuted ? 'OFF' : 'ON');
+  soundToggle.classList.toggle('on', !soundMuted);
+}
+function toggleSound() {
+  soundMuted = !soundMuted;
+  try { localStorage.setItem('dg_mute', soundMuted ? '1' : '0'); } catch (e) {}
+  Sfx.setMuted(soundMuted);
+  refreshSoundToggle();
+}
+soundToggle.addEventListener('click', toggleSound);
+refreshSoundToggle();
+
+// browsers only allow audio after a user gesture
+const audioBoot = () => {
+  Sfx.init();
+  Sfx.setMuted(soundMuted);
+  document.removeEventListener('pointerdown', audioBoot);
+  document.removeEventListener('keydown', audioBoot);
+};
+document.addEventListener('pointerdown', audioBoot);
+document.addEventListener('keydown', audioBoot);
+
 // ─── Hero name ────────────────────────────────────────────────────────────────
 const nameInput = document.getElementById('hero-name');
 try { nameInput.value = localStorage.getItem('dg_name') || ''; } catch (e) {}
@@ -600,6 +629,7 @@ function onKeyDown(e) {
   // Space/arrows must never re-trigger a focused button or scroll the page
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   if (e.code === 'KeyE') castSpecial();
+  if (e.code === 'KeyM') toggleSound();
   if (e.code === 'Escape') {
     if (gameState === 'playing') pauseGame();
     else if (gameState === 'paused') resumeGame();
@@ -750,6 +780,8 @@ function startGame() {
   hideAllScreens();
   hud.classList.remove('hidden');
   gameState = 'playing';
+  Sfx.init();
+  Sfx.startMusic();
   lastTime  = performance.now();
   buildTileMap();
   startNextWave();
@@ -760,10 +792,12 @@ function startGame() {
 
 function pauseGame()  { gameState = 'paused'; showScreen('pause'); }
 function resumeGame() { gameState = 'playing'; hideAllScreens(); lastTime = performance.now(); animId = requestAnimationFrame(loop); }
-function quitGame()   { gameState = 'start'; hud.classList.add('hidden'); showScreen('start'); cancelAnimationFrame(animId); }
+function quitGame()   { gameState = 'start'; hud.classList.add('hidden'); showScreen('start'); cancelAnimationFrame(animId); Sfx.stopMusic(); }
 
 function gameOver() {
   gameState = 'gameover';
+  Sfx.stopMusic();
+  Sfx.play('gameover');
   hud.classList.add('hidden');
   finalScore.textContent = score;
   finalWave.textContent  = wave;
@@ -796,6 +830,7 @@ function startNextWave() {
 
   waveDisplay.textContent = wave + '/' + WAVES_TOTAL;
   if (bossType) {
+    Sfx.play('bosshorn');
     spawnBoss(bossType);
     const name = ENEMY_DEFS[bossType].boss;
     announceWave(wave === WAVES_TOTAL ? `☠ FINAL BOSS: ${name} ☠` : `☠ BOSS: ${name} ☠`);
@@ -942,6 +977,8 @@ function attack() {
   if (now - lastShot < effRate) return;
   lastShot = now;
 
+  Sfx.play(w.attack === 'melee' ? 'swing' : w.attack === 'arrow' ? 'arrow' : 'shoot');
+
   const angle = aimAngle();
   if (w.attack === 'melee') {
     meleeAttack(angle, w);
@@ -1011,6 +1048,7 @@ function meleeAttack(angle, w) {
 function castSpecial() {
   if (gameState !== 'playing' || player.specialTimer > 0) return;
   player.specialTimer = player.def.specialCd;
+  Sfx.play('special');
 
   const angle = aimAngle();
   const w = player.weapon;
@@ -1090,6 +1128,7 @@ function castSpecial() {
 }
 
 function explode(b) {
+  Sfx.play('explosion');
   spawnParticles(b.x, b.y, '#ff8c00', 24);
   spawnParticles(b.x, b.y, '#ffe066', 16);
   for (const e of enemies) {
@@ -1123,6 +1162,7 @@ function dealDamage(e, [min, max], kind, fx, fy) {
 
   e.hp -= dmg;
   e.hitFlash = 150;
+  Sfx.play('hit');
   spawnParticles(fx !== undefined ? fx : e.x, fy !== undefined ? fy : e.y, '#ff4444', 6);
 
   if (Math.random() < st.lifeSteal / 100 && player.hp < player.maxHp) {
@@ -1205,6 +1245,7 @@ function gainXp(amount) {
     player.maxHp += LEVEL_HP;
     player.hp = Math.min(player.maxHp, player.hp + LEVEL_HP);
     addFloatText(player.x, player.y - 34, 'LEVEL UP!', '#66ccff');
+    Sfx.play('levelup');
     spawnParticles(player.x, player.y, '#66ccff', 16);
   }
 }
@@ -1306,10 +1347,12 @@ function updateEnemies(dt) {
       const st = player.stats;
       if (Math.random() < Math.min(60, st.dodge) / 100) {
         addFloatText(player.x, player.y - 26, 'DODGE', '#3498db');
+        Sfx.play('dodge');
       } else {
         const dmg = Math.max(1, Math.round(e.dmg * (1 - st.armor / (st.armor + 15))));
         player.hp -= dmg;
         spawnParticles(player.x, player.y, '#ff0000', 8);
+        Sfx.play('hurt');
         if (player.hp <= 0) { player.hp = 0; gameOver(); return; }
       }
     }
@@ -1321,6 +1364,7 @@ function killEnemy(e) {
   e.dead = true;
   score += e.score;
   gainXp(e.score); // xp mirrors score value
+  Sfx.play(e.boss ? 'explosion' : 'death');
   spawnParticles(e.x, e.y, enemyColor(e.type), 12);
   if (e.boss) {
     spawnParticles(e.x, e.y, '#ffd700', 40);
@@ -1369,7 +1413,7 @@ function updateCoins(dt) {
       c.x += (dx / dist) * pull * factor;
       c.y += (dy / dist) * pull * factor;
     }
-    if (dist < 14) { c.dead = true; gold++; spawnParticles(c.x, c.y, '#ffd700', 4); }
+    if (dist < 14) { c.dead = true; gold++; spawnParticles(c.x, c.y, '#ffd700', 4); Sfx.play('coin'); }
   }
   coins = coins.filter(c => !c.dead);
 }
@@ -1434,6 +1478,7 @@ function checkWaveComplete() {
       setTimeout(victory, 1200);
       return;
     }
+    Sfx.play('waveclear');
     announceWave(`WAVE ${wave} CLEAR!`);
     // weapon upgrade drop every 2 waves until max tier
     if (wave % 2 === 0 && player.tier < player.def.tiers.length - 1) {
@@ -1446,6 +1491,8 @@ function checkWaveComplete() {
 function victory() {
   if (gameState !== 'playing') return;
   gameState = 'victory';
+  Sfx.stopMusic();
+  Sfx.play('victory');
   hud.classList.add('hidden');
   document.getElementById('victory-score').textContent = score;
   document.getElementById('victory-gold').textContent  = gold;
@@ -1544,6 +1591,7 @@ function buyOffer(i) {
   gold -= price;
   o.sold = true;
   applyMods(o.item.mods);
+  Sfx.play('buy');
   updateHUD();
   renderShop();
 }
@@ -1552,6 +1600,7 @@ function shopHeal() {
   if (gold < HEAL_PRICE || player.hp >= player.maxHp) return;
   gold -= HEAL_PRICE;
   player.hp = Math.min(player.maxHp, player.hp + 30);
+  Sfx.play('potion');
   updateHUD();
   renderShop();
 }
@@ -1579,6 +1628,7 @@ function updatePotions(dt) {
       player.hp += heal;
       spawnParticles(player.x, player.y, '#2ecc71', 10);
       addFloatText(player.x, player.y - 24, `+${heal} HP`, '#2ecc71');
+      Sfx.play('potion');
     }
   }
   potions = potions.filter(pt => !pt.dead);
@@ -1612,6 +1662,7 @@ function updateChests(dt) {
 function lootChest(ch) {
   ch.state = 'looted';
   ch.fade  = 1;
+  Sfx.play('chest');
   const roll = Math.random();
 
   if (roll < 0.15) {
@@ -1620,6 +1671,7 @@ function lootChest(ch) {
     chests = chests.filter(c => c !== ch);
     spawnParticles(ch.x, ch.y, '#9b59b6', 14);
     addFloatText(ch.x, ch.y - 24, 'MIMIC!', '#e74c3c');
+    Sfx.play('mimic');
     enemies.push(makeEnemy('mimic', ch.x, ch.y));
   } else if (roll < 0.6) {
     // gold burst
@@ -1677,6 +1729,7 @@ function updateUpgrades(dt) {
       player.weapon = player.def.tiers[player.tier];
       announceWave(player.weapon.name + '!');
       spawnParticles(u.x, u.y, '#ffd700', 16);
+      Sfx.play('upgrade');
     }
   }
   upgrades = upgrades.filter(u => !u.dead);

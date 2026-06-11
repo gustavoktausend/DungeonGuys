@@ -338,6 +338,13 @@ html, body {
 }
 
 /* ─── Auto-aim toggle ──────────────────────────────────── */
+.toggle-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 .aim-toggle {
   font-family: var(--display-font);
   font-size: clamp(14px, 2vw, 18px);
