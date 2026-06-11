@@ -299,6 +299,19 @@ document.getElementById('btn-resume').addEventListener('click',  mouseOnly(resum
 document.getElementById('btn-quit').addEventListener('click',    mouseOnly(quitGame));
 document.getElementById('btn-restart').addEventListener('click', mouseOnly(startGame));
 document.getElementById('btn-victory-restart').addEventListener('click', mouseOnly(startGame));
+document.getElementById('btn-share-wa').addEventListener('click', mouseOnly(() => shareWhatsApp(false)));
+document.getElementById('btn-share-wa-victory').addEventListener('click', mouseOnly(() => shareWhatsApp(true)));
+
+// ─── WhatsApp share ───────────────────────────────────────────────────────────
+function shareWhatsApp(won) {
+  const url = 'https://gustavoktausend.github.io/DungeonGuys/';
+  const msg = won
+    ? `🏆 ${player.name} conquistou a masmorra! Zerei o Dungeon Crawler no nível ${player.level} ` +
+      `com ${score} pontos! Consegue igualar? ⚔️ ${url}`
+    : `⚔️ ${player.name} lutou até a wave ${wave}/${WAVES_TOTAL} e caiu no nível ${player.level}, ` +
+      `com ${score} pontos no Dungeon Crawler! Consegue me superar? ${url}`;
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+}
 
 document.getElementById('btn-next-wave').addEventListener('click', mouseOnly(closeShop));
 document.getElementById('btn-shop-heal').addEventListener('click', mouseOnly(shopHeal));
