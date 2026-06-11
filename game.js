@@ -311,6 +311,7 @@ const screens = {
   shop:     document.getElementById('shop-screen'),
   gameover: document.getElementById('gameover-screen'),
   victory:  document.getElementById('victory-screen'),
+  levelup:  document.getElementById('levelup-screen'),
 };
 const hud          = document.getElementById('hud');
 const hpBar        = document.getElementById('hp-bar');
@@ -341,6 +342,11 @@ document.getElementById('btn-resume').addEventListener('click',  mouseOnly(resum
 document.getElementById('btn-quit').addEventListener('click',    mouseOnly(quitGame));
 document.getElementById('btn-restart').addEventListener('click', mouseOnly(startGame));
 document.getElementById('btn-victory-restart').addEventListener('click', mouseOnly(startGame));
+document.getElementById('levelup-choices').addEventListener('click', e => {
+  if (e.detail === 0) return;
+  const btn = e.target.closest('.shop-item[data-i]');
+  if (btn) pickBlessing(Number(btn.dataset.i));
+});
 document.getElementById('btn-share-wa').addEventListener('click', mouseOnly(() => shareWhatsApp(false)));
 document.getElementById('btn-share-wa-victory').addEventListener('click', mouseOnly(() => shareWhatsApp(true)));
 document.getElementById('btn-share-tg').addEventListener('click', mouseOnly(() => shareTelegram(false)));
@@ -630,6 +636,9 @@ function onKeyDown(e) {
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   if (e.code === 'KeyE') castSpecial();
   if (e.code === 'KeyM') toggleSound();
+  if (gameState === 'levelup' && /^(Digit|Numpad)[123]$/.test(e.code)) {
+    pickBlessing(Number(e.code.slice(-1)) - 1);
+  }
   if (e.code === 'Escape') {
     if (gameState === 'playing') pauseGame();
     else if (gameState === 'paused') resumeGame();
@@ -747,6 +756,8 @@ function startGame() {
   potions     = [];
   chests      = [];
   floatTexts  = [];
+  pendingLevelUps     = 0;
+  pendingAfterLevelUp = null;
 
   recolorPlayerSheet(); // make sure the chosen outfit color is baked in
 
@@ -1244,10 +1255,90 @@ function gainXp(amount) {
     player.level++;
     player.maxHp += LEVEL_HP;
     player.hp = Math.min(player.maxHp, player.hp + LEVEL_HP);
+    pendingLevelUps++;
     addFloatText(player.x, player.y - 34, 'LEVEL UP!', '#66ccff');
     Sfx.play('levelup');
     spawnParticles(player.x, player.y, '#66ccff', 16);
   }
+  maybeOpenLevelUp();
+}
+
+// ─── Level-up blessings (pick 1 of 3) ─────────────────────────────────────────
+const LEVELUP_POOL = [
+  { name: 'MIGHT',       icon: '💪', mods: { dmgPct: 4 } },
+  { name: 'HASTE',       icon: '⚡', mods: { atkSpeedPct: 5 } },
+  { name: 'PRECISION',   icon: '🎯', mods: { crit: 3 } },
+  { name: 'IRON SKIN',   icon: '🛡', mods: { armor: 1 } },
+  { name: 'EVASION',     icon: '💨', mods: { dodge: 3 } },
+  { name: 'VITALITY',    icon: '❤', mods: { maxHp: 15 } },
+  { name: 'REGROWTH',    icon: '🌿', mods: { hpRegen: 1 } },
+  { name: 'BLOODTHIRST', icon: '🦇', mods: { lifeSteal: 2 } },
+  { name: 'SWIFTNESS',   icon: '👢', mods: { speedPct: 4 } },
+  { name: 'FORTUNE',     icon: '🍀', mods: { luck: 10 } },
+  { name: 'REACH',       icon: '👁', mods: { range: 15 } },
+  { name: 'ENDURANCE',   icon: '🥤', mods: { stamina: 15 } },
+  { name: 'SHARPNESS',   icon: '🗡', dmgKind: 'melee',     mods: { meleeDmg: 2 } },
+  { name: 'PIERCING',    icon: '🏹', dmgKind: 'arrow',     mods: { rangedDmg: 2 } },
+  { name: 'SORCERY',     icon: '🔥', dmgKind: 'elemental', mods: { elementalDmg: 2 } },
+];
+
+let pendingLevelUps     = 0;
+let levelChoices        = [];
+let pendingAfterLevelUp = null; // 'shop' | 'victory' blocked while choosing
+
+function playerDmgKind() {
+  const atk = player.weapon.attack;
+  return atk === 'melee' ? 'melee' : atk === 'arrow' ? 'arrow' : 'elemental';
+}
+
+function maybeOpenLevelUp() {
+  if (pendingLevelUps <= 0 || gameState !== 'playing') return;
+  gameState = 'levelup';
+  rollLevelChoices();
+  showScreen('levelup');
+}
+
+function rollLevelChoices() {
+  const kind = playerDmgKind();
+  const pool = LEVELUP_POOL.filter(b => !b.dmgKind || b.dmgKind === kind);
+  levelChoices = [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
+
+  document.getElementById('levelup-choices').innerHTML = levelChoices.map((b, i) => {
+    const fx = Object.entries(b.mods)
+      .map(([k, v]) => `<span class="fx-pos">${fmtMod(k, v)}</span>`).join('');
+    return `
+      <button class="shop-item" data-i="${i}">
+        <span class="shop-icon">${b.icon}</span>
+        <span class="shop-name">${b.name}</span>
+        <span class="shop-effects">${fx}</span>
+      </button>`;
+  }).join('');
+}
+
+function pickBlessing(i) {
+  const b = levelChoices[i];
+  if (!b || gameState !== 'levelup') return;
+  applyMods(b.mods);
+  Sfx.play('upgrade');
+  pendingLevelUps--;
+  if (pendingLevelUps > 0) {
+    rollLevelChoices(); // queued level-ups: choose again
+  } else {
+    closeLevelUp();
+  }
+}
+
+function closeLevelUp() {
+  hideAllScreens();
+  gameState = 'playing';
+  lastTime  = performance.now();
+  animId = requestAnimationFrame(loop);
+  updateHUD();
+  // wave-end events that fired while choosing resume now
+  const after = pendingAfterLevelUp;
+  pendingAfterLevelUp = null;
+  if (after === 'shop')    openShop();
+  if (after === 'victory') victory();
 }
 
 function spawnEnemy(type) {
@@ -1489,6 +1580,7 @@ function checkWaveComplete() {
 }
 
 function victory() {
+  if (gameState === 'levelup') { pendingAfterLevelUp = 'victory'; return; }
   if (gameState !== 'playing') return;
   gameState = 'victory';
   Sfx.stopMusic();
@@ -1501,6 +1593,7 @@ function victory() {
 
 // ─── Shop flow ────────────────────────────────────────────────────────────────
 function openShop() {
+  if (gameState === 'levelup') { pendingAfterLevelUp = 'shop'; return; }
   if (gameState !== 'playing') return;
   gameState  = 'shop';
   rerollCost = 5;

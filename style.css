@@ -483,6 +483,25 @@ html, body {
   text-shadow: 0 0 16px rgba(201,162,39,0.7);
 }
 
+/* ─── Level Up Screen ──────────────────────────────────── */
+.levelup-sub {
+  font-size: clamp(13px, 1.8vw, 17px);
+  color: var(--gold);
+  letter-spacing: 0.28em;
+}
+
+.levelup-cards {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.levelup-cards .shop-item {
+  min-width: 130px;
+  padding: 16px 14px;
+}
+
 /* ─── Shop Screen ──────────────────────────────────────── */
 .shop-inner { min-width: min(480px, 92vw); }
 
