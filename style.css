@@ -336,6 +336,29 @@ html, body {
   color: var(--parchment);
 }
 
+/* ─── Auto-aim toggle ──────────────────────────────────── */
+.aim-toggle {
+  font-family: var(--display-font);
+  font-size: clamp(14px, 2vw, 18px);
+  letter-spacing: 0.1em;
+  color: rgba(232,220,200,0.6);
+  background: linear-gradient(180deg, #241a12, #170f0a);
+  border: 2px solid var(--bronze);
+  outline: 1px solid rgba(201,162,39,0.2);
+  outline-offset: -5px;
+  padding: 8px 22px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.aim-toggle:hover { border-color: var(--gold); }
+
+.aim-toggle.on {
+  color: var(--gold-light);
+  border-color: var(--gold);
+  box-shadow: 0 0 14px rgba(201,162,39,0.35), inset 0 0 10px rgba(201,162,39,0.12);
+}
+
 /* ─── Instructions ─────────────────────────────────────── */
 .instructions {
   display: flex;

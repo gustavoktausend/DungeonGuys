@@ -388,6 +388,41 @@ document.querySelectorAll('.class-card').forEach(card => {
   });
 });
 
+// ─── Auto-aim ─────────────────────────────────────────────────────────────────
+let autoAim = false;
+try { autoAim = localStorage.getItem('dg_autoaim') === '1'; } catch (e) {}
+
+const aimToggle = document.getElementById('auto-aim-toggle');
+function refreshAimToggle() {
+  aimToggle.textContent = '🎯 AUTO-AIM: ' + (autoAim ? 'ON' : 'OFF');
+  aimToggle.classList.toggle('on', autoAim);
+}
+aimToggle.addEventListener('click', () => {
+  autoAim = !autoAim;
+  try { localStorage.setItem('dg_autoaim', autoAim ? '1' : '0'); } catch (e) {}
+  refreshAimToggle();
+});
+refreshAimToggle();
+
+function nearestEnemy() {
+  let best = null, bestD = Infinity;
+  for (const e of enemies) {
+    if (e.dead) continue;
+    const d = (e.x - player.x) ** 2 + (e.y - player.y) ** 2;
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  return best;
+}
+
+// where the player is aiming: nearest enemy when auto-aim is on, else the mouse
+function aimAngle() {
+  if (autoAim) {
+    const t = nearestEnemy();
+    if (t) return Math.atan2(t.y - player.y, t.x - player.x);
+  }
+  return Math.atan2(mouse.y - player.y, mouse.x - player.x);
+}
+
 // ─── Hero name ────────────────────────────────────────────────────────────────
 const nameInput = document.getElementById('hero-name');
 try { nameInput.value = localStorage.getItem('dg_name') || ''; } catch (e) {}
@@ -802,8 +837,8 @@ function updatePlayer(dt) {
   p.x = Math.max(PLAY.left + margin, Math.min(PLAY.right  - margin, nx));
   p.y = Math.max(PLAY.top  + margin, Math.min(PLAY.bottom - margin, ny));
 
-  // face toward mouse
-  p.facing = Math.atan2(mouse.y - p.y, mouse.x - p.x);
+  // face toward the current aim (mouse, or nearest enemy with auto-aim)
+  p.facing = aimAngle();
 
   // auto-fire on hold (mouse or keys)
   if (mouseDown || keys['Space'] || keys['KeyZ']) {
@@ -819,7 +854,7 @@ function attack() {
   if (now - lastShot < effRate) return;
   lastShot = now;
 
-  const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+  const angle = aimAngle();
   if (w.attack === 'melee') {
     meleeAttack(angle, w);
   } else {
@@ -889,7 +924,7 @@ function castSpecial() {
   if (gameState !== 'playing' || player.specialTimer > 0) return;
   player.specialTimer = player.def.specialCd;
 
-  const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+  const angle = aimAngle();
   const w = player.weapon;
 
   switch (player.def.special) {
