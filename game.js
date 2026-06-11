@@ -300,6 +300,7 @@ let nextWaveDelay = 3000;
 let spawnQueue   = [];
 let runKills = 0, runGoldEarned = 0;
 let shakeT = 0, shakeMag = 0; // screen shake timer/magnitude
+let waveHasBoss = false;
 
 function addShake(mag, dur = 220) {
   shakeMag = Math.max(shakeMag, mag);
@@ -367,8 +368,8 @@ function shareMessage(won) {
   return won
     ? `🏆 ${player.name} conquistou a masmorra! Zerei o DungeonGuys no nível ${player.level} ` +
       `com ${score} pontos! Consegue igualar? ⚔️`
-    : `⚔️ ${player.name} lutou até a wave ${wave}/${WAVES_TOTAL} e caiu no nível ${player.level}, ` +
-      `com ${score} pontos no DungeonGuys! Consegue me superar?`;
+    : `⚔️ ${player.name} lutou até a wave ${gameMode === 'endless' ? wave + ' (ENDLESS)' : wave + '/' + WAVES_TOTAL}` +
+      ` e caiu no nível ${player.level}, com ${score} pontos no DungeonGuys! Consegue me superar?`;
 }
 
 function shareWhatsApp(won) {
@@ -412,9 +413,13 @@ function refreshClassCards() {
 function refreshClassRecord() {
   const r  = Save.classRecord(selectedClass);
   const el = document.getElementById('class-record');
-  el.textContent = r
-    ? `BEST · WAVE ${r.wave} · LV ${r.level} · ${r.score} PTS` + (r.victories ? ` · ${r.victories}🏆` : '')
-    : 'NO RUNS YET';
+  if (!r) { el.textContent = 'NO RUNS YET'; return; }
+  const parts = ['BEST'];
+  if (r.wave)  parts.push(`WAVE ${r.wave}`);
+  if (r.ewave) parts.push(`∞${r.ewave}`);
+  parts.push(`LV ${r.level}`, `${r.score} PTS`);
+  if (r.victories) parts.push(`${r.victories}🏆`);
+  el.textContent = parts.join(' · ');
 }
 
 function tryUnlock(cls) {
@@ -584,6 +589,36 @@ const audioBoot = () => {
 };
 document.addEventListener('pointerdown', audioBoot);
 document.addEventListener('keydown', audioBoot);
+
+// ─── Game mode (campaign 16 waves / endless) ──────────────────────────────────
+let gameMode = Save.data.settings.mode === 'endless' ? 'endless' : 'campaign';
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.classList.toggle('selected', btn.dataset.mode === gameMode);
+  btn.addEventListener('click', () => {
+    gameMode = btn.dataset.mode;
+    Save.data.settings.mode = gameMode;
+    Save.persist();
+    document.querySelectorAll('.mode-btn').forEach(b =>
+      b.classList.toggle('selected', b.dataset.mode === gameMode));
+  });
+});
+
+// which bosses (if any) spawn on this wave
+function bossPlanForWave(w) {
+  if (BOSS_WAVES[w]) return [BOSS_WAVES[w]]; // fixed bosses at 8 and 16
+  if (gameMode !== 'endless' || w <= WAVES_TOTAL) return [];
+  // endless past 16: guaranteed every 8th wave, otherwise a 20% roll —
+  // and deeper waves can stack more than one boss at once
+  if (w % 8 !== 0 && Math.random() >= 0.2) return [];
+  const types = Object.values(BOSS_WAVES);
+  const extraChance = Math.min(0.5, (w - WAVES_TOTAL) * 0.03);
+  let count = 1 + (Math.random() < extraChance ? 1 : 0);
+  if (w >= 32 && Math.random() < 0.25) count++;
+  const plan = [];
+  for (let i = 0; i < count; i++) plan.push(types[Math.floor(Math.random() * types.length)]);
+  return plan;
+}
 
 // ─── Hero name ────────────────────────────────────────────────────────────────
 const nameInput = document.getElementById('hero-name');
@@ -863,7 +898,7 @@ function gameOver() {
   Sfx.play('gameover');
   hud.classList.add('hidden');
   const newBest = Save.recordRun(player.cls,
-    { score, wave, level: player.level, won: false, kills: runKills, gold: runGoldEarned });
+    { score, wave, level: player.level, won: false, kills: runKills, gold: runGoldEarned, mode: gameMode });
   finalScore.textContent = score;
   finalWave.textContent  = wave;
   finalGold.textContent  = gold;
@@ -886,9 +921,10 @@ function startNextWave() {
   chests  = [];
   enemyBullets = [];
 
-  const bossType = BOSS_WAVES[wave];
+  const bossPlan = bossPlanForWave(wave);
+  waveHasBoss = bossPlan.length > 0;
   // boss waves have a smaller escort so the boss is the show
-  const count = bossType ? 8 : 4 + wave * 3;
+  const count = waveHasBoss ? 8 + Math.max(0, Math.floor((wave - WAVES_TOTAL) / 2)) : 4 + wave * 3;
   spawnQueue = [];
   for (let i = 0; i < count; i++) {
     spawnQueue.push({
@@ -898,12 +934,17 @@ function startNextWave() {
   }
 
   if (wave >= 6) tryUnlock('ninja');
-  waveDisplay.textContent = wave + '/' + WAVES_TOTAL;
-  if (bossType) {
+  waveDisplay.textContent = gameMode === 'endless' ? wave + ' ∞' : wave + '/' + WAVES_TOTAL;
+  if (waveHasBoss) {
     Sfx.play('bosshorn');
-    spawnBoss(bossType);
-    const name = ENEMY_DEFS[bossType].boss;
-    announceWave(wave === WAVES_TOTAL ? `☠ FINAL BOSS: ${name} ☠` : `☠ BOSS: ${name} ☠`);
+    bossPlan.forEach((type, i) => spawnBoss(type, i, bossPlan.length));
+    if (bossPlan.length > 1) {
+      announceWave(`☠ ${bossPlan.length} BOSSES! ☠`);
+    } else {
+      const name = ENEMY_DEFS[bossPlan[0]].boss;
+      announceWave(gameMode === 'campaign' && wave === WAVES_TOTAL
+        ? `☠ FINAL BOSS: ${name} ☠` : `☠ BOSS: ${name} ☠`);
+    }
   } else {
     announceWave(`— WAVE ${wave} —`);
   }
@@ -1535,8 +1576,9 @@ function applyPoison(e, dps, dur) {
   e.poisonT   = Math.max(e.poisonT, dur);
 }
 
-function spawnBoss(type) {
-  const e = makeEnemy(type, canvas.width / 2, PLAY.top + 60);
+function spawnBoss(type, index = 0, total = 1) {
+  const x = canvas.width / 2 + (index - (total - 1) / 2) * 140;
+  const e = makeEnemy(type, x, PLAY.top + 60);
   enemies.push(e);
   spawnParticles(e.x, e.y, '#e74c3c', 30);
 }
@@ -1735,7 +1777,7 @@ function checkWaveComplete() {
   if (!waveActive) return;
 
   // survival timer: normal waves auto-complete after 30s (bosses must die)
-  if (!BOSS_WAVES[wave] && waveTimer >= WAVE_DURATION) {
+  if (!waveHasBoss && waveTimer >= WAVE_DURATION) {
     for (const e of enemies) {
       if (!e.dead) spawnParticles(e.x, e.y, '#9b59b6', 6); // vanish, no loot
     }
@@ -1746,7 +1788,7 @@ function checkWaveComplete() {
   const allSpawned = spawnQueue.every(s => s.spawned);
   if (allSpawned && enemies.length === 0) {
     waveActive = false;
-    if (wave >= WAVES_TOTAL) {
+    if (gameMode === 'campaign' && wave >= WAVES_TOTAL) {
       setTimeout(victory, 1200);
       return;
     }
@@ -1768,7 +1810,7 @@ function victory() {
   Sfx.play('victory');
   hud.classList.add('hidden');
   const newBest = Save.recordRun(player.cls,
-    { score, wave, level: player.level, won: true, kills: runKills, gold: runGoldEarned });
+    { score, wave, level: player.level, won: true, kills: runKills, gold: runGoldEarned, mode: gameMode });
   document.getElementById('victory-score').textContent = score;
   document.getElementById('victory-gold').textContent  = gold;
   document.getElementById('new-record-victory').classList.toggle('hidden', !newBest);
@@ -2039,16 +2081,19 @@ function updateHUD() {
   // wave countdown (boss waves don't expire)
   const timerEl = document.getElementById('wave-timer');
   if (!waveActive)            timerEl.textContent = '—';
-  else if (BOSS_WAVES[wave])  timerEl.textContent = '☠';
+  else if (waveHasBoss)       timerEl.textContent = '☠';
   else timerEl.textContent = Math.max(0, Math.ceil((WAVE_DURATION - waveTimer) / 1000));
 
-  // boss HP bar (top center)
-  const boss = enemies.find(e => e.boss && !e.dead);
+  // boss HP bar (top center) — aggregates when several bosses are alive
+  const bosses  = enemies.filter(e => e.boss && !e.dead);
   const bossBar = document.getElementById('boss-bar');
-  if (boss) {
+  if (bosses.length > 0) {
     bossBar.classList.remove('hidden');
-    document.getElementById('boss-name').textContent = boss.boss;
-    document.getElementById('boss-hp').style.width = (boss.hp / boss.maxHp * 100) + '%';
+    document.getElementById('boss-name').textContent =
+      bosses.length === 1 ? bosses[0].boss : bosses.length + ' BOSSES';
+    const hp    = bosses.reduce((s, b) => s + Math.max(0, b.hp), 0);
+    const maxHp = bosses.reduce((s, b) => s + b.maxHp, 0);
+    document.getElementById('boss-hp').style.width = (hp / maxHp * 100) + '%';
   } else {
     bossBar.classList.add('hidden');
   }

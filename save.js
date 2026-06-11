@@ -5,7 +5,7 @@ const Save = (() => {
   const KEY = 'dungeonguys_save_v1';
 
   const defaults = () => ({
-    settings: { mute: false, autoAim: false, name: '', colors: {} },
+    settings: { mute: false, autoAim: false, name: '', colors: {}, mode: 'campaign' },
     records:  {}, // per class: { score, wave, level, victories }
     progress: {
       runs: 0, kills: 0, goldEarned: 0, bossKills: 0, victories: 0,
@@ -61,8 +61,9 @@ const Save = (() => {
     const newBest = run.score > 0 && (!prev || run.score > prev.score);
     const r = prev || { score: 0, wave: 0, level: 0, victories: 0 };
     r.score = Math.max(r.score, run.score);
-    r.wave  = Math.max(r.wave,  run.wave);
     r.level = Math.max(r.level, run.level);
+    if (run.mode === 'endless') r.ewave = Math.max(r.ewave || 0, run.wave);
+    else                        r.wave  = Math.max(r.wave, run.wave);
     if (run.won) r.victories = (r.victories || 0) + 1;
     data.records[cls] = r;
     persist();
