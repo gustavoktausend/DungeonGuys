@@ -1622,14 +1622,18 @@ function drawHeldWeapon(p) {
     angle = s.angle - s.arc / 2 + s.arc * progress;
   }
 
-  const dist  = 16;
-  const handY = p.y + 12; // anchor at hand height, not over the head
+  const scale = SPRITE_SCALE / 2; // weapons read better at half sprite size
+  const dist  = 14;
+  const side  = 7;                // perpendicular shift: held in the hand, not centered
+  const handY = p.y + 10;
+  const ox = Math.cos(angle) * dist + Math.cos(angle + Math.PI / 2) * side;
+  const oy = Math.sin(angle) * dist + Math.sin(angle + Math.PI / 2) * side;
   ctx.save();
-  ctx.translate(p.x + Math.cos(angle) * dist, handY + Math.sin(angle) * dist);
+  ctx.translate(p.x + ox, handY + oy);
   ctx.rotate(angle + Math.PI / 2); // sprites point up
   ctx.drawImage(SHEET, sx, sy, sw, sh,
-    -sw * SPRITE_SCALE / 2, -sh * SPRITE_SCALE / 2,
-    sw * SPRITE_SCALE, sh * SPRITE_SCALE);
+    -sw * scale / 2, -sh * scale / 2,
+    sw * scale, sh * scale);
   ctx.restore();
 }
 
