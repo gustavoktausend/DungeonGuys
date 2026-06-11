@@ -79,6 +79,80 @@ const WALL_TILES = {
 // playable area inside the walls (recomputed on resize)
 let PLAY = { left: TILE, right: 0, top: TILE * 2, bottom: 0 };
 
+// ─── Arena obstacles & spike traps ────────────────────────────────────────────
+const OBSTACLE_SPRITES = { column: [80, 80, 16, 48], crate: [288, 408, 16, 24] };
+const SPIKE_FRAMES = frames(16, 192, 16, 16, 4);
+let obstacles = []; // { kind, x, y, r, hp, dead }
+let traps     = []; // { x, y, offset }
+
+// a fresh random layout each run: solid columns, breakable crates, spike traps
+function generateArena() {
+  obstacles = [];
+  traps     = [];
+  const margin = 110;
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+
+  const spots = [];
+  const want  = 4 + Math.floor(Math.random() * 3);
+  let attempts = 0;
+  while (spots.length < want && attempts++ < 300) {
+    const x = PLAY.left + margin + Math.random() * (PLAY.right  - PLAY.left - margin * 2);
+    const y = PLAY.top  + margin + Math.random() * (PLAY.bottom - PLAY.top  - margin * 2);
+    if (Math.hypot(x - cx, y - cy) < 150) continue; // keep the spawn clear
+    if (spots.some(s => Math.hypot(x - s.x, y - s.y) < 110)) continue;
+    spots.push({ x, y });
+  }
+  spots.forEach((s, i) => {
+    if (i < 2 || Math.random() < 0.5) {
+      obstacles.push({ kind: 'column', x: s.x, y: s.y, r: 16, hp: Infinity, dead: false });
+    } else {
+      obstacles.push({ kind: 'crate', x: s.x, y: s.y, r: 14, hp: 40, dead: false });
+    }
+  });
+
+  const trapCount = 2 + Math.floor(Math.random() * 2);
+  attempts = 0;
+  while (traps.length < trapCount && attempts++ < 200) {
+    const x = PLAY.left + margin + Math.random() * (PLAY.right  - PLAY.left - margin * 2);
+    const y = PLAY.top  + margin + Math.random() * (PLAY.bottom - PLAY.top  - margin * 2);
+    if (Math.hypot(x - cx, y - cy) < 140) continue;
+    if (obstacles.some(o => Math.hypot(x - o.x, y - o.y) < 90)) continue;
+    if (traps.some(t => Math.hypot(x - t.x, y - t.y) < 130)) continue;
+    traps.push({ x, y, offset: Math.random() * 4 });
+  }
+}
+
+// pushes a circular entity out of solid obstacles
+function resolveObstacles(ent, radius) {
+  for (const o of obstacles) {
+    if (o.dead) continue;
+    const dx = ent.x - o.x, dy = ent.y - o.y;
+    const d  = Math.hypot(dx, dy), min = o.r + radius;
+    if (d < min && d > 0.001) {
+      ent.x = o.x + dx / d * min;
+      ent.y = o.y + dy / d * min;
+    }
+  }
+}
+
+function trapFrameAt(tr)  { return Math.floor(performance.now() / 450 + tr.offset) % 4; }
+function trapDangerous(tr) { return trapFrameAt(tr) >= 2; } // spikes out
+
+function damageCrate(o, dmg) {
+  o.hp -= dmg;
+  spawnParticles(o.x, o.y, '#8B6914', 5);
+  if (o.hp <= 0 && !o.dead) {
+    o.dead = true;
+    Sfx.play('chest');
+    spawnParticles(o.x, o.y, '#b8945a', 14);
+    const n = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      coins.push({ x: o.x, y: o.y, vx: Math.cos(a) * 2, vy: Math.sin(a) * 2, dead: false, bob: Math.random() * 6 });
+    }
+  }
+}
+
 let animTick = 0; // global 4-frame animation clock
 
 // ─── Palette swap (classic outfit recolor via RGB sliders) ───────────────────
@@ -917,6 +991,8 @@ function startGame() {
   runGoldEarned = 0;
 
   recolorPlayerSheet(); // make sure the chosen outfit color is baked in
+  buildTileMap();
+  generateArena();
 
   const cls = CLASS_DEFS[selectedClass];
   player = {
@@ -1162,6 +1238,11 @@ function updatePlayer(dt) {
   const margin = 10;
   p.x = Math.max(PLAY.left + margin, Math.min(PLAY.right  - margin, nx));
   p.y = Math.max(PLAY.top  + margin, Math.min(PLAY.bottom - margin, ny));
+  resolveObstacles(p, 10);
+
+  for (const tr of traps) {
+    if (trapDangerous(tr) && Math.hypot(p.x - tr.x, p.y - tr.y) < 18) damagePlayer(10);
+  }
 
   // face toward the current aim (mouse, or nearest enemy with auto-aim)
   p.facing = aimAngle();
@@ -1225,6 +1306,17 @@ function meleeAttack(angle, w) {
     player.y + Math.sin(angle) * range * 0.6,
     '#ffe066', 4
   );
+
+  for (const o of obstacles) {
+    if (o.dead || o.kind !== 'crate') continue;
+    const od = Math.hypot(o.x - player.x, o.y - player.y);
+    if (od <= range + o.r) {
+      let diff = Math.atan2(o.y - player.y, o.x - player.x) - angle;
+      while (diff >  Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      if (Math.abs(diff) <= w.arc / 2) damageCrate(o, w.damage[1]);
+    }
+  }
 
   for (const e of enemies) {
     if (e.dead) continue;
@@ -1397,6 +1489,20 @@ function updateBullets(dt) {
       continue;
     }
 
+    let blocked = false;
+    for (const o of obstacles) {
+      if (o.dead) continue;
+      if (Math.hypot(b.x - o.x, b.y - o.y) < o.r + 4) {
+        if (o.kind === 'crate') damageCrate(o, (b.damage[0] + b.damage[1]) / 2);
+        b.dead = true;
+        if (b.type === 'fireball') explode(b);
+        else spawnParticles(b.x, b.y, '#aab7c4', 4);
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) continue;
+
     for (const e of enemies) {
       if (e.dead || b.hitIds.has(e)) continue;
       if (rectCircle(e.x, e.y, e.w, e.h, b.x, b.y, b.type === 'fireball' ? 9 : 5)) {
@@ -1513,6 +1619,11 @@ function updateEnemyBullets(dt) {
         b.x < PLAY.left || b.x > PLAY.right ||
         b.y < PLAY.top  || b.y > PLAY.bottom) {
       b.dead = true;
+      continue;
+    }
+    if (obstacles.some(o => !o.dead && Math.hypot(b.x - o.x, b.y - o.y) < o.r + 4)) {
+      b.dead = true;
+      spawnParticles(b.x, b.y, '#9b59b6', 4);
       continue;
     }
     const dx = b.x - player.x, dy = b.y - player.y;
@@ -1700,6 +1811,7 @@ function makeEnemy(type, x, y) {
     cd: {},
     bossState: 'chase',
     stateT: 0,
+    trapT: 0,
     chargeDir: { x: 0, y: 0 },
     enraged: false,
   };
@@ -1827,6 +1939,21 @@ function updateEnemies(dt) {
       e.x += (dx / dist) * e.speed * slowMult * move * factor;
       e.y += (dy / dist) * e.speed * slowMult * move * factor;
     }
+    if (!e.boss) resolveObstacles(e, Math.max(e.w, e.h) * 0.35);
+
+    // spike traps hurt monsters too — lure them in
+    if (e.trapT > 0) e.trapT -= dt;
+    for (const tr of traps) {
+      if (e.trapT <= 0 && trapDangerous(tr) &&
+          Math.hypot(e.x - tr.x, e.y - tr.y) < 18 + Math.max(e.w, e.h) / 4) {
+        e.trapT = 500;
+        e.hp -= 15;
+        e.hitFlash = 150;
+        addFloatText(e.x, e.y - e.h / 2 - 8, 15, '#e8dcc8');
+        if (e.hp <= 0) { killEnemy(e); break; }
+      }
+    }
+    if (e.dead) continue;
 
     // hit player (dodge avoids it entirely; armor reduces it)
     // exploders skip contact damage — their threat is the blast, and contact
@@ -2301,6 +2428,7 @@ function render() {
   }
   drawTiles();
   drawTorches();
+  drawTraps();
   drawChests();
   drawCoins();
   drawPotions();
@@ -2309,6 +2437,7 @@ function render() {
   drawEnemyBullets();
   drawMeleeSwings();
   drawBossTelegraphs();
+  drawObstacles();
   drawEnemies();
   drawPlayer();
   drawParticles();
@@ -2399,6 +2528,22 @@ function drawBullets() {
       ctx.fill();
       ctx.shadowBlur = 0;
     }
+  }
+}
+
+// Arena obstacles & traps
+function drawObstacles() {
+  for (const o of obstacles) {
+    if (o.dead) continue;
+    const [sx, sy, sw, sh] = OBSTACLE_SPRITES[o.kind];
+    // bottom-anchored: sprite bottom sits at the collision circle's south edge
+    drawSprite([sx, sy, sw, sh], o.x, o.y + o.r - sh, false);
+  }
+}
+
+function drawTraps() {
+  for (const tr of traps) {
+    drawSprite(SPIKE_FRAMES[trapFrameAt(tr)], tr.x, tr.y, false);
   }
 }
 
