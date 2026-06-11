@@ -320,6 +320,18 @@ document.querySelectorAll('.class-card').forEach(card => {
   });
 });
 
+// ─── Hero name ────────────────────────────────────────────────────────────────
+const nameInput = document.getElementById('hero-name');
+try { nameInput.value = localStorage.getItem('dg_name') || ''; } catch (e) {}
+nameInput.addEventListener('input', () => {
+  try { localStorage.setItem('dg_name', nameInput.value); } catch (e) {}
+});
+
+function heroName() {
+  const n = nameInput.value.trim().toUpperCase();
+  return n || 'HERO';
+}
+
 // ─── Color picker wiring ──────────────────────────────────────────────────────
 const colorSliders = ['r', 'g', 'b'].map(ch => document.getElementById('slider-' + ch));
 const colorValues  = ['r', 'g', 'b'].map(ch => document.getElementById('val-' + ch));
@@ -375,6 +387,7 @@ window.addEventListener('load', () => {
   window.addEventListener('resize', resizeCanvas);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup',   e => {
+    if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
     keys[e.code] = false;
     // button activation by Space fires on keyup — block it here too
     if (e.code === 'Space') e.preventDefault();
@@ -397,6 +410,7 @@ function resizeCanvas() {
 }
 
 function onKeyDown(e) {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'text') return; // typing the hero name
   keys[e.code] = true;
   // Space/arrows must never re-trigger a focused button or scroll the page
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
@@ -535,6 +549,10 @@ function startGame() {
     specialTimer: 0,
     stats: baseStats(),
     regenAcc: 0,
+    name: heroName(),
+    level: 1,
+    xp: 0,
+    xpNext: XP_BASE,
     stamina: STAMINA_BASE,
     sprinting: false,
     dustTimer: 0,
@@ -930,8 +948,27 @@ const ENEMY_DEFS = {
                   boss: 'OGRE WARLORD', scale: 3, summons: ['demon', 'brute'] },
 };
 
-const WAVES_TOTAL = 16;
-const BOSS_WAVES  = { 8: 'zombie_king', 16: 'ogre_warlord' };
+const WAVES_TOTAL   = 16;
+const BOSS_WAVES    = { 8: 'zombie_king', 16: 'ogre_warlord' };
+const WAVE_DURATION = 30000; // survive this long and the wave is cleared (boss waves excluded)
+
+// ─── XP / leveling ────────────────────────────────────────────────────────────
+const XP_BASE     = 100;  // xp needed for level 2
+const XP_GROWTH   = 1.4;  // each level needs 40% more
+const LEVEL_HP    = 10;   // max HP gained per level (also healed)
+
+function gainXp(amount) {
+  player.xp += amount;
+  while (player.xp >= player.xpNext) {
+    player.xp -= player.xpNext;
+    player.xpNext = Math.round(player.xpNext * XP_GROWTH);
+    player.level++;
+    player.maxHp += LEVEL_HP;
+    player.hp = Math.min(player.maxHp, player.hp + LEVEL_HP);
+    addFloatText(player.x, player.y - 34, 'LEVEL UP!', '#66ccff');
+    spawnParticles(player.x, player.y, '#66ccff', 16);
+  }
+}
 
 function spawnEnemy(type) {
   const side = Math.floor(Math.random() * 4);
@@ -1026,6 +1063,7 @@ function updateEnemies(dt) {
 function killEnemy(e) {
   e.dead = true;
   score += e.score;
+  gainXp(e.score); // xp mirrors score value
   spawnParticles(e.x, e.y, enemyColor(e.type), 12);
   if (e.boss) {
     spawnParticles(e.x, e.y, '#ffd700', 40);
@@ -1122,6 +1160,16 @@ function updateSpawnQueue(dt) {
 
 function checkWaveComplete() {
   if (!waveActive) return;
+
+  // survival timer: normal waves auto-complete after 30s (bosses must die)
+  if (!BOSS_WAVES[wave] && waveTimer >= WAVE_DURATION) {
+    for (const e of enemies) {
+      if (!e.dead) spawnParticles(e.x, e.y, '#9b59b6', 6); // vanish, no loot
+    }
+    enemies = [];
+    spawnQueue.forEach(s => s.spawned = true);
+  }
+
   const allSpawned = spawnQueue.every(s => s.spawned);
   if (allSpawned && enemies.length === 0) {
     waveActive = false;
@@ -1394,6 +1442,15 @@ function updateHUD() {
   const staPct = player.stamina / maxStamina() * 100;
   stBar.style.width = staPct + '%';
   stBar.classList.toggle('recovering', !player.sprinting && staPct < 100);
+
+  document.getElementById('hud-name').textContent = player.name + ' · LV ' + player.level;
+  document.getElementById('xp-bar').style.width = (player.xp / player.xpNext * 100) + '%';
+
+  // wave countdown (boss waves don't expire)
+  const timerEl = document.getElementById('wave-timer');
+  if (!waveActive)            timerEl.textContent = '—';
+  else if (BOSS_WAVES[wave])  timerEl.textContent = '☠';
+  else timerEl.textContent = Math.max(0, Math.ceil((WAVE_DURATION - waveTimer) / 1000));
 
   // boss HP bar (top center)
   const boss = enemies.find(e => e.boss && !e.dead);

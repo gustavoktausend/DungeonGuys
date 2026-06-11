@@ -39,6 +39,10 @@
             </button>
           </div>
         </div>
+        <div class="name-picker">
+          <div class="color-label">— HERO NAME —</div>
+          <input type="text" id="hero-name" maxlength="12" placeholder="HERO" autocomplete="off" />
+        </div>
         <div class="color-picker">
           <div class="color-label">— ARMOR COLOR —</div>
           <div class="color-row">
@@ -127,8 +131,11 @@
   <!-- HUD (visible during gameplay) -->
   <div id="hud" class="hidden">
     <div id="hud-left">
+      <div id="hud-name">HERO · LV 1</div>
       <div class="hud-label">HP</div>
       <div id="hp-bar-wrap"><div id="hp-bar"></div></div>
+      <div class="hud-label xp-label">XP</div>
+      <div id="xp-bar-wrap"><div id="xp-bar"></div></div>
       <div class="hud-label st-label">STAMINA</div>
       <div id="st-bar-wrap"><div id="st-bar"></div></div>
       <div class="hud-label sp-label">SPECIAL [E]</div>
@@ -137,6 +144,7 @@
     <div id="hud-center">
       <div class="hud-label">WAVE</div>
       <div id="wave-display">1</div>
+      <div id="wave-timer">30</div>
     </div>
     <div id="hud-right">
       <div class="hud-label">SCORE</div>
