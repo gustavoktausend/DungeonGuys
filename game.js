@@ -1624,7 +1624,7 @@ function drawHeldWeapon(p) {
 
   // weapons have very different sprite heights (sword 21px, staff 30px);
   // normalize them all to the same on-screen size
-  const targetH = 16;
+  const targetH = 22;
   const scale   = targetH / sh;
   const dist    = 17;
   const side    = 12;             // perpendicular shift: held in the hand, away from the body
