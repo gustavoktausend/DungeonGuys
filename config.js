@@ -39,6 +39,17 @@ ANIMS.mimic = { idle: [MIMIC_F[0], MIMIC_F[1], MIMIC_F[2], MIMIC_F[1]],
 const FLASK_RED    = [288, 352, 16, 16];
 const CHEST_FRAMES = frames(304, 416, 16, 16, 3); // closed → opening → open
 const CHEST_EMPTY  = [336, 400, 16, 16];          // looted chest left behind
+// second atlas: KingBell's Pixel Sprite Mixer characters (16x24 frames,
+// rows follow assets/100_Anims_Order_List.txt — row1 idle, row2 run)
+const COP_SHEET = new Image();
+COP_SHEET.src = 'assets/copRobo.png';
+
+ANIMS.coprobo = {
+  idle: frames(0, 0,  16, 24, 4),
+  run:  frames(0, 24, 16, 24, 4),
+  sheet: COP_SHEET,
+};
+
 const COIN_FRAMES = frames(289, 385, 6, 7, 4, 8);
 const WEAPON_SPRITES = {
   staff:       [324, 129,  8, 30],
@@ -165,6 +176,7 @@ const OUTFIT_COLORS = {
   ninja:     { light: [ 61, 115,  79], dark: [ 49,  65,  82] },
   priestess: { light: [202, 230, 245], dark: [ 86, 152, 204] },
   witch:     { light: [ 86, 152, 204], dark: [ 89,  86, 189] },
+  coprobo:   { light: [145, 141, 141], dark: [ 72,  70,  70] },
 };
 // strip containing idle+run(+hit) frames of each class on the sheet
 const CLASS_REGION = {
@@ -174,6 +186,7 @@ const CLASS_REGION = {
   ninja:     [368, 153, 128, 23],
   priestess: [368, 304, 128, 16],
   witch:     [128, 132, 144, 28],
+  coprobo:   [0, 0, 176, 48], // idle+run rows of its own sheet
 };
 
 let playerSheet  = SHEET;            // recolored copy used to draw the player
@@ -187,13 +200,15 @@ const lum = ([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b;
 
 // rebuilds playerSheet swapping the outfit pair for the chosen color
 function recolorPlayerSheet() {
-  if (!SHEET.complete || SHEET.naturalWidth === 0) { playerSheet = SHEET; return; }
+  // each class recolors a copy of ITS OWN atlas (0x72 sheet or a mixer sheet)
+  const srcSheet = ANIMS[CLASS_DEFS[selectedClass].anim].sheet || SHEET;
+  if (!srcSheet.complete || srcSheet.naturalWidth === 0) { playerSheet = srcSheet; return; }
   try {
     const oc = document.createElement('canvas');
-    oc.width  = SHEET.naturalWidth;
-    oc.height = SHEET.naturalHeight;
+    oc.width  = srcSheet.naturalWidth;
+    oc.height = srcSheet.naturalHeight;
     const c = oc.getContext('2d');
-    c.drawImage(SHEET, 0, 0);
+    c.drawImage(srcSheet, 0, 0);
 
     const { light, dark } = OUTFIT_COLORS[selectedClass];
     const target = currentColor();
@@ -213,7 +228,7 @@ function recolorPlayerSheet() {
     c.putImageData(img, rx, ry);
     playerSheet = oc;
   } catch (e) {
-    playerSheet = SHEET; // canvas tainted (file:// double-click) — keep defaults
+    playerSheet = srcSheet; // canvas tainted (file:// double-click) — keep defaults
   }
 }
 
@@ -284,6 +299,16 @@ const CLASS_DEFS = {
       { name: 'CURSED STAFF', sprite: 'staff',       attack: 'bolt', fireRate: 240, bulletSpeed: 7, range: 380, damage: [18, 26], pierce: 0, count: 1, poison: { dps: 8,  dur: 3000 } },
       { name: 'VENOM STAFF',  sprite: 'staff_green', attack: 'bolt', fireRate: 210, bulletSpeed: 8, range: 420, damage: [24, 34], pierce: 1, count: 1, poison: { dps: 12, dur: 3000 } },
       { name: 'PLAGUE STAFF', sprite: 'staff_green', attack: 'bolt', fireRate: 180, bulletSpeed: 9, range: 460, damage: [32, 44], pierce: 2, count: 1, poison: { dps: 18, dur: 4000 } },
+    ],
+  },
+  coprobo: {
+    hp: 95, speed: 2.8, anim: 'coprobo',
+    special: 'emp', specialCd: 8000,
+    // guns are part of the robot sprite itself — no held weapon overlay
+    tiers: [
+      { name: 'PISTOL',       sprite: null, attack: 'bullet', fireRate: 190, bulletSpeed: 10, range: 420, damage: [16, 24], pierce: 0, count: 1 },
+      { name: 'SMG',          sprite: null, attack: 'bullet', fireRate: 110, bulletSpeed: 11, range: 440, damage: [14, 20], pierce: 0, count: 1 },
+      { name: 'PLASMA RIFLE', sprite: null, attack: 'bullet', fireRate: 150, bulletSpeed: 13, range: 520, damage: [26, 36], pierce: 2, count: 1 },
     ],
   },
 };

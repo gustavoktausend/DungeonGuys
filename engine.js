@@ -266,6 +266,7 @@ function startNextWave() {
   }
 
   if (wave >= 6) tryUnlock('ninja');
+  if (wave >= 10) tryUnlock('coprobo');
   waveDisplay.textContent = gameMode === 'endless' ? wave + ' ∞' : wave + '/' + WAVES_TOTAL;
   if (waveHasBoss) {
     Sfx.play('bosshorn');

@@ -1129,3 +1129,5 @@ html, body {
 
 /* ─── Platform-specific instructions ───────────────────── */
 .instructions.hidden-inst { display: none; }
+
+.robo-icon { color: #66ccff; text-shadow: 0 0 10px rgba(102,204,255,0.6); }

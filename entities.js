@@ -73,7 +73,9 @@ let pendingAfterLevelUp = null; // 'shop' | 'victory' blocked while choosing
 
 function playerDmgKind() {
   const atk = player.weapon.attack;
-  return atk === 'melee' ? 'melee' : atk === 'arrow' ? 'arrow' : 'elemental';
+  return atk === 'melee' ? 'melee'
+       : (atk === 'arrow' || atk === 'bullet') ? 'arrow'
+       : 'elemental';
 }
 
 function maybeOpenLevelUp() {

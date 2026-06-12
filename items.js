@@ -19,8 +19,7 @@ function closeShop() {
 }
 
 function rollOffers() {
-  const atk  = player.weapon.attack; // 'melee' | 'arrow' | 'bolt'
-  const kind = atk === 'melee' ? 'melee' : atk === 'arrow' ? 'arrow' : 'elemental';
+  const kind = playerDmgKind(); // melee | arrow (incl. bullets) | elemental
   const pool = ITEM_POOL.filter(it => !it.dmgKind || it.dmgKind === kind);
   const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, 4);
   shopOffers = picks.map(it => ({ item: it, sold: false }));

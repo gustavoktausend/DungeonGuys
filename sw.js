@@ -1,7 +1,7 @@
 // sw.js — DungeonGuys service worker
 // Code files go network-first (deploys are picked up immediately, cache is the
 // offline fallback); heavy static assets go cache-first.
-const CACHE = 'dungeonguys-v2';
+const CACHE = 'dungeonguys-v3';
 
 const PRECACHE = [
   '.',
@@ -18,6 +18,7 @@ const PRECACHE = [
   'render.js',
   'manifest.json',
   'assets/dungeon_tileset.png',
+  'assets/copRobo.png',
   'icons/icon-192.png',
   'icons/icon-512.png',
 ];

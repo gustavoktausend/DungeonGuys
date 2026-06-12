@@ -85,6 +85,19 @@ function drawBullets() {
         -sw * SPRITE_SCALE / 2, -sh * SPRITE_SCALE / 2,
         sw * SPRITE_SCALE, sh * SPRITE_SCALE);
       ctx.restore();
+    } else if (b.type === 'bullet') {
+      // energy tracer
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.angle);
+      ctx.shadowColor = '#66ccff';
+      ctx.shadowBlur  = 8;
+      ctx.fillStyle   = '#aef';
+      ctx.fillRect(-7, -1.5, 14, 3);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(2, -1, 5, 2);
+      ctx.shadowBlur = 0;
+      ctx.restore();
     } else if (b.type === 'fireball') {
       const pulse = 1 + Math.sin(performance.now() / 60) * 0.15;
       ctx.shadowColor = '#ff4500';
@@ -204,7 +217,18 @@ function drawUpgrades() {
     ctx.fillStyle = g;
     ctx.fillRect(u.x - 28, u.y + bobY - 28, 56, 56);
 
-    drawSprite(WEAPON_SPRITES[nextTier.sprite], u.x, u.y + bobY, false);
+    if (WEAPON_SPRITES[nextTier.sprite]) {
+      drawSprite(WEAPON_SPRITES[nextTier.sprite], u.x, u.y + bobY, false);
+    } else {
+      // techy upgrade chip for spriteless weapons
+      ctx.shadowColor = '#66ccff';
+      ctx.shadowBlur  = 10;
+      ctx.fillStyle   = '#1a3a5c';
+      ctx.fillRect(u.x - 8, u.y + bobY - 8, 16, 16);
+      ctx.fillStyle = '#66ccff';
+      ctx.fillRect(u.x - 4, u.y + bobY - 4, 8, 8);
+      ctx.shadowBlur = 0;
+    }
   }
 }
 
@@ -266,6 +290,7 @@ function drawPlayer() {
 
 // held weapon, rotated toward the aim (sword follows the swing arc)
 function drawHeldWeapon(p) {
+  if (!p.weapon.sprite) return; // gun classes carry the weapon in the sprite itself
   const [sx, sy, sw, sh] = WEAPON_SPRITES[p.weapon.sprite];
   let angle = p.facing;
 

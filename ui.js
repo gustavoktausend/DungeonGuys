@@ -186,6 +186,7 @@ const UNLOCKS = {
   ninja:     'REACH WAVE 6',
   priestess: 'SLAY THE ZOMBIE KING',
   witch:     'REACH LEVEL 8',
+  coprobo:   'REACH WAVE 10',
 };
 
 function refreshClassCards() {
@@ -543,6 +544,10 @@ setInterval(() => {
 SHEET.addEventListener('load', () => {
   recolorPlayerSheet();
   setSliders(currentColor());
+  drawColorPreview();
+});
+COP_SHEET.addEventListener('load', () => {
+  recolorPlayerSheet();
   drawColorPreview();
 });
 

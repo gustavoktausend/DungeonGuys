@@ -252,6 +252,22 @@ function castSpecial() {
       spawnParticles(player.x, player.y, '#ffd700', 24);
       break;
 
+    case 'emp': {
+      // EMP blast: shockwave damages and slows everything nearby
+      addShake(8, 300);
+      spawnParticles(player.x, player.y, '#66ccff', 28);
+      meleeSwings.push({ angle: 0, life: 1, range: 150, arc: Math.PI * 2 }); // ring visual
+      for (const e of enemies) {
+        if (e.dead) continue;
+        const dx2 = e.x - player.x, dy2 = e.y - player.y;
+        if (Math.sqrt(dx2 * dx2 + dy2 * dy2) <= 150 + Math.max(e.w, e.h) / 2) {
+          dealDamage(e, [40, 60], 'bullet');
+          if (!e.dead) e.slowT = Math.max(e.slowT, 3000);
+        }
+      }
+      break;
+    }
+
     case 'hex':
       // hex: every living enemy is poisoned and slowed
       for (const e of enemies) {
@@ -290,7 +306,7 @@ function dealDamage(e, [min, max], kind, fx, fy) {
   const st = player.stats;
   let dmg = min + Math.floor(Math.random() * (max - min + 1));
   dmg += kind === 'melee' ? st.meleeDmg
-       : kind === 'arrow' ? st.rangedDmg
+       : (kind === 'arrow' || kind === 'bullet') ? st.rangedDmg
        : st.elementalDmg; // bolt / fireball
   dmg = Math.max(1, Math.round(dmg * (1 + st.dmgPct / 100)));
 
