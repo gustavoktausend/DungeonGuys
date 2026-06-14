@@ -186,7 +186,7 @@ const UNLOCKS = {
   ninja:     'REACH WAVE 6',
   priestess: 'SLAY THE ZOMBIE KING',
   witch:     'REACH LEVEL 8',
-  coprobo:   'REACH WAVE 10',
+  // coprobo is unlocked by default for now
 };
 
 function refreshClassCards() {
