@@ -156,7 +156,6 @@ function startGame() {
   coins       = [];
   particles   = [];
   meleeSwings = [];
-  upgrades    = [];
   potions     = [];
   chests      = [];
   floatTexts  = [];
@@ -181,7 +180,6 @@ function startGame() {
     speed: cls.speed,
     cls: selectedClass,
     def: cls,
-    tier: 0,
     weapon: cls.tiers[0],
     specialTimer: 0,
     stats: baseStats(),

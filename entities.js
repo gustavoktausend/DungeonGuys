@@ -551,10 +551,6 @@ function checkWaveComplete() {
     }
     Sfx.play('waveclear');
     announceWave(`WAVE ${wave} CLEAR!`);
-    // weapon upgrade drop every 2 waves until max tier
-    if (wave % 2 === 0 && player.tier < player.def.tiers.length - 1) {
-      spawnUpgrade();
-    }
     setTimeout(openShop, 1500);
   }
 }

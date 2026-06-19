@@ -8,7 +8,6 @@ function update(dt) {
   updateEnemyBullets(dt);
   updateMeleeSwings(dt);
   updateEnemies(dt);
-  updateUpgrades(dt);
   updatePotions(dt);
   updateChests(dt);
   updateCoins(dt);

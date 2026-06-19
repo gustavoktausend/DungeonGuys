@@ -5,7 +5,7 @@ let gameState = 'start'; // start | playing | paused | gameover
 let lastTime   = 0;
 let animId     = null;
 
-let player, bullets, enemies, coins, particles, meleeSwings, upgrades;
+let player, bullets, enemies, coins, particles, meleeSwings;
 let enemyBullets = [];
 let potions, chests, floatTexts;
 

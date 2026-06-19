@@ -14,7 +14,6 @@ function render() {
   drawChests();
   drawCoins();
   drawPotions();
-  drawUpgrades();
   drawBullets();
   drawEnemyBullets();
   drawMeleeSwings();
@@ -212,35 +211,6 @@ function drawMeleeSwings() {
     ctx.arc(player.x, player.y, s.range - 12, start, end);
     ctx.stroke();
     ctx.restore();
-  }
-}
-
-// Weapon upgrade pickups (shows the next-tier weapon floating)
-function drawUpgrades() {
-  for (const u of upgrades) {
-    if (u.dead) continue;
-    const nextTier = player.def.tiers[Math.min(player.tier + 1, player.def.tiers.length - 1)];
-    const bobY = Math.sin(u.bob) * 4;
-
-    // glow halo
-    const g = ctx.createRadialGradient(u.x, u.y + bobY, 0, u.x, u.y + bobY, 28);
-    g.addColorStop(0, 'rgba(255,215,0,0.35)');
-    g.addColorStop(1, 'rgba(255,215,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(u.x - 28, u.y + bobY - 28, 56, 56);
-
-    if (WEAPON_SPRITES[nextTier.sprite]) {
-      drawSprite(WEAPON_SPRITES[nextTier.sprite], u.x, u.y + bobY, false);
-    } else {
-      // techy upgrade chip for spriteless weapons
-      ctx.shadowColor = '#66ccff';
-      ctx.shadowBlur  = 10;
-      ctx.fillStyle   = '#1a3a5c';
-      ctx.fillRect(u.x - 8, u.y + bobY - 8, 16, 16);
-      ctx.fillStyle = '#66ccff';
-      ctx.fillRect(u.x - 4, u.y + bobY - 4, 8, 8);
-      ctx.shadowBlur = 0;
-    }
   }
 }
 

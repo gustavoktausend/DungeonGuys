@@ -207,37 +207,6 @@ function updateFloatTexts(dt) {
   floatTexts = floatTexts.filter(t => t.life > 0);
 }
 
-// ─── Weapon upgrades ──────────────────────────────────────────────────────────
-function spawnUpgrade() {
-  // keep the pickup inside the playable floor and clear of solid obstacles
-  const m = 90;
-  let x, y, attempts = 0;
-  do {
-    x = PLAY.left + m + Math.random() * (PLAY.right  - PLAY.left - m * 2);
-    y = PLAY.top  + m + Math.random() * (PLAY.bottom - PLAY.top  - m * 2);
-  } while (attempts++ < 30 &&
-           obstacles.some(o => !o.dead && Math.hypot(x - o.x, y - o.y) < o.r + 28));
-  upgrades.push({ x, y, bob: 0, dead: false });
-}
-
-function updateUpgrades(dt) {
-  for (const u of upgrades) {
-    if (u.dead) continue;
-    u.bob += dt * 0.004;
-    const dx = player.x - u.x;
-    const dy = player.y - u.y;
-    if (Math.sqrt(dx * dx + dy * dy) < 24) {
-      u.dead = true;
-      player.tier++;
-      player.weapon = player.def.tiers[player.tier];
-      announceWave(player.weapon.name + '!');
-      spawnParticles(u.x, u.y, '#ffd700', 16);
-      Sfx.play('upgrade');
-    }
-  }
-  upgrades = upgrades.filter(u => !u.dead);
-}
-
 // HUD
 function updateHUD() {
   const pct = Math.max(0, player.hp / player.maxHp * 100);
