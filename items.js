@@ -21,7 +21,9 @@ function closeShop() {
 // places a bought item into its slot, syncs the active weapon, recalculates stats
 function equipItem(item) {
   player.equipment = equipInto(player.equipment, item);
-  if (item.slot === 'weapon') player.weapon = player.equipment.weapon;
+  // catalog weapons nest their combat params under .weapon; player.weapon must
+  // stay flat (same shape as CLASS_DEFS tiers) for combat/render/archetype
+  if (item.slot === 'weapon') player.weapon = { ...item.weapon, name: item.name };
   recalcStats();
 }
 
