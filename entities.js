@@ -235,6 +235,7 @@ function updateEnemies(dt) {
   for (const e of enemies) {
     if (e.dead) continue;
     if (e.hitFlash > 0) e.hitFlash -= dt;
+    const startX = e.x, startY = e.y; // to tell idle from running this frame
 
     // bosses call reinforcements every 6s
     if (e.boss && e.summons) {
@@ -305,6 +306,8 @@ function updateEnemies(dt) {
       e.y += (dy / dist) * e.speed * slowMult * move * factor;
     }
     if (!e.boss) resolveObstacles(e, Math.max(e.w, e.h) * 0.35);
+    // did it actually move? drives the idle/run animation
+    e.moving = Math.hypot(e.x - startX, e.y - startY) > 0.06;
 
     // spike traps hurt monsters too — lure them in
     if (e.trapT > 0) e.trapT -= dt;

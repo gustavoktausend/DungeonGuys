@@ -17,7 +17,7 @@ const Sfx = (() => {
     if (!AC) return;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = muted ? 0 : 0.5;
+    master.gain.value = muted ? 0 : vol;
     master.connect(ctx.destination);
     musicGain = ctx.createGain();
     musicGain.gain.value = 0.2;
@@ -152,13 +152,29 @@ const Sfx = (() => {
 
   function stopMusic() {
     musicOn = false;
+    setBossMode(false);
     if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+  }
+
+  function setBossMode(on) {
+    bossMode = on;
+    if (musicGain) musicGain.gain.value = on ? 0.28 : 0.2;
+  }
+
+  function applyMasterGain() {
+    if (master) master.gain.value = muted ? 0 : vol;
   }
 
   function setMuted(m) {
     muted = m;
-    if (master) master.gain.value = m ? 0 : 0.5;
+    applyMasterGain();
   }
 
-  return { init, play, startMusic, stopMusic, setMuted, get muted() { return muted; } };
+  function setVolume(v) {
+    vol = Math.max(0, Math.min(1, v));
+    applyMasterGain();
+  }
+
+  return { init, play, startMusic, stopMusic, setMuted, setVolume, setBossMode,
+           get muted() { return muted; } };
 })();

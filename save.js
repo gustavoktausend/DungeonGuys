@@ -5,7 +5,7 @@ const Save = (() => {
   const KEY = 'dungeonguys_save_v1';
 
   const defaults = () => ({
-    settings: { mute: false, autoAim: false, name: '', colors: {}, mode: 'campaign' },
+    settings: { mute: false, autoAim: false, name: '', colors: {}, mode: 'campaign', volume: 0.5, shake: true },
     records:  {}, // per class: { score, wave, level, victories }
     progress: {
       runs: 0, kills: 0, goldEarned: 0, bossKills: 0, victories: 0,

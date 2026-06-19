@@ -208,13 +208,15 @@ function updateFloatTexts(dt) {
 
 // ─── Weapon upgrades ──────────────────────────────────────────────────────────
 function spawnUpgrade() {
-  const margin = 120;
-  upgrades.push({
-    x: margin + Math.random() * (canvas.width  - margin * 2),
-    y: margin + Math.random() * (canvas.height - margin * 2),
-    bob: 0,
-    dead: false,
-  });
+  // keep the pickup inside the playable floor and clear of solid obstacles
+  const m = 90;
+  let x, y, attempts = 0;
+  do {
+    x = PLAY.left + m + Math.random() * (PLAY.right  - PLAY.left - m * 2);
+    y = PLAY.top  + m + Math.random() * (PLAY.bottom - PLAY.top  - m * 2);
+  } while (attempts++ < 30 &&
+           obstacles.some(o => !o.dead && Math.hypot(x - o.x, y - o.y) < o.r + 28));
+  upgrades.push({ x, y, bob: 0, dead: false });
 }
 
 function updateUpgrades(dt) {

@@ -380,6 +380,35 @@ function toggleSound() {
 soundToggle.addEventListener('click', toggleSound);
 refreshSoundToggle();
 
+// ─── Volume slider ────────────────────────────────────────────────────────────
+const savedVolume = typeof Save.data.settings.volume === 'number' ? Save.data.settings.volume : 0.5;
+Sfx.setVolume(savedVolume);
+const volumeSlider = document.getElementById('slider-volume');
+const volumeVal    = document.getElementById('val-volume');
+volumeSlider.value = Math.round(savedVolume * 100);
+volumeVal.textContent = volumeSlider.value;
+volumeSlider.addEventListener('input', () => {
+  const v = Number(volumeSlider.value) / 100;
+  volumeVal.textContent = volumeSlider.value;
+  Sfx.setVolume(v);
+  Save.data.settings.volume = v;
+  Save.persist();
+});
+
+// ─── Screen-shake toggle ──────────────────────────────────────────────────────
+const shakeToggle = document.getElementById('shake-toggle');
+function refreshShakeToggle() {
+  shakeToggle.textContent = '📳 SHAKE: ' + (screenShake ? 'ON' : 'OFF');
+  shakeToggle.classList.toggle('on', screenShake);
+}
+shakeToggle.addEventListener('click', () => {
+  screenShake = !screenShake;
+  Save.data.settings.shake = screenShake;
+  Save.persist();
+  refreshShakeToggle();
+});
+refreshShakeToggle();
+
 // browsers only allow audio after a user gesture
 const audioBoot = () => {
   Sfx.init();
