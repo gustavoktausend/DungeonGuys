@@ -26,10 +26,17 @@ function equipItem(item) {
 }
 
 function rollOffers() {
-  const kind = playerDmgKind(); // melee | arrow (incl. bullets) | elemental
-  const pool = ITEM_POOL.filter(it => !it.dmgKind || it.dmgKind === kind);
-  const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, 4);
-  shopOffers = picks.map(it => ({ item: it, sold: false }));
+  // consumables (ITEM_POOL), filtered by the player's damage kind
+  const kind = playerDmgKind();
+  const cPool = ITEM_POOL.filter(it => !it.dmgKind || it.dmgKind === kind);
+  shopOffers = [...cPool].sort(() => Math.random() - 0.5).slice(0, 4)
+    .map(it => ({ item: it, sold: false }));
+
+  // equipment (EQUIPMENT), filtered by class/archetype eligibility
+  const arch = playerArchetype();
+  const ePool = EQUIPMENT.filter(it => isEligible(it, player.cls, arch));
+  shopEquipOffers = [...ePool].sort(() => Math.random() - 0.5).slice(0, 4)
+    .map(it => ({ item: it, sold: false }));
 }
 
 // permanent stat changes (blessings, shop consumables) feed the permanent layer;
@@ -56,16 +63,39 @@ function fmtMod(k, v) {
 function renderShop() {
   document.getElementById('shop-gold').textContent = gold;
 
-  // offers
-  const wrap = document.getElementById('shop-items');
-  wrap.innerHTML = shopOffers.map((o, i) => {
-    if (o.sold) {
-      return `<div class="shop-item offer sold"><span class="shop-name">SOLD</span></div>`;
-    }
+  // equipped-set panel (8 slots)
+  const slotLabels = { weapon: 'WEAPON', offhand: 'OFF-HAND', helm: 'HELM', armor: 'ARMOR',
+                       boots: 'BOOTS', ring1: 'RING', ring2: 'RING', amulet: 'AMULET' };
+  document.getElementById('shop-slots').innerHTML = EQUIP_SLOTS.map(s => {
+    const it = player.equipment[s];
+    return `<div class="slot-chip ${it ? 'filled' : 'empty'}" title="${slotLabels[s]}">
+        <span class="slot-ico">${it ? (it.icon || '▫') : '·'}</span>
+        <span class="slot-lbl">${it ? it.name : slotLabels[s]}</span>
+      </div>`;
+  }).join('');
+
+  // equipment offers (with comparison)
+  document.getElementById('shop-equip').innerHTML = shopEquipOffers.map((o, i) => {
+    if (o.sold) return `<div class="shop-item offer sold"><span class="shop-name">SOLD</span></div>`;
+    const price   = itemPrice(o.item);
+    const blocked = !canEquip(o.item, player.equipment);
+    const dis     = gold < price || blocked;
+    return `
+      <button class="shop-item offer equip" data-i="${i}" ${dis ? 'disabled' : ''}>
+        <span class="shop-icon">${o.item.icon}</span>
+        <span class="shop-name">${o.item.name}</span>
+        <span class="shop-effects">${equipDelta(o.item)}</span>
+        ${blocked ? '<span class="cmp-down">NEEDS 1-HAND</span>' : ''}
+        <span class="shop-price">${price}</span>
+      </button>`;
+  }).join('');
+
+  // consumable offers (unchanged behavior)
+  document.getElementById('shop-items').innerHTML = shopOffers.map((o, i) => {
+    if (o.sold) return `<div class="shop-item offer sold"><span class="shop-name">SOLD</span></div>`;
     const price = itemPrice(o.item);
     const fx = Object.entries(o.item.mods)
-      .map(([k, v]) => `<span class="${v > 0 ? 'fx-pos' : 'fx-neg'}">${fmtMod(k, v)}</span>`)
-      .join('');
+      .map(([k, v]) => `<span class="${v > 0 ? 'fx-pos' : 'fx-neg'}">${fmtMod(k, v)}</span>`).join('');
     return `
       <button class="shop-item offer" data-i="${i}" ${gold < price ? 'disabled' : ''}>
         <span class="shop-icon">${o.item.icon}</span>
@@ -76,20 +106,16 @@ function renderShop() {
   }).join('');
 
   // heal / reroll
-  const healBtn   = document.getElementById('btn-shop-heal');
-  const rerollBtn = document.getElementById('btn-shop-reroll');
   document.getElementById('price-heal').textContent   = HEAL_PRICE;
   document.getElementById('price-reroll').textContent = rerollCost;
-  healBtn.disabled   = gold < HEAL_PRICE || player.hp >= player.maxHp;
-  rerollBtn.disabled = gold < rerollCost;
+  document.getElementById('btn-shop-heal').disabled   = gold < HEAL_PRICE || player.hp >= player.maxHp;
+  document.getElementById('btn-shop-reroll').disabled = gold < rerollCost;
 
-  // stats panel
+  // stats panel (only non-zero stats)
   const st = player.stats;
-  // only surface stats the player actually has — zeros are just noise
   const rows = [['MAX HP', player.maxHp], ['HP', Math.ceil(player.hp)]]
     .concat(Object.keys(st).filter(k => st[k] !== 0).map(k => [
-      STAT_LABELS[k],
-      (st[k] > 0 ? '+' : '') + st[k] + (PCT_STATS.has(k) ? '%' : ''),
+      STAT_LABELS[k], (st[k] > 0 ? '+' : '') + st[k] + (PCT_STATS.has(k) ? '%' : ''),
     ]));
   document.getElementById('shop-stats').innerHTML =
     rows.map(([l, v]) => `<div class="stat-line"><span>${l}</span><span>${v}</span></div>`).join('');
@@ -103,6 +129,46 @@ function buyOffer(i) {
   gold -= price;
   o.sold = true;
   applyMods(o.item.mods);
+  Sfx.play('buy');
+  updateHUD();
+  renderShop();
+}
+
+// short comparison string vs. the item currently in the target slot.
+// shows stat-mod deltas; for weapons also the average-damage delta.
+function equipDelta(item) {
+  const slot = targetSlot(item, player.equipment);
+  const cur  = player.equipment[slot];
+  const parts = [];
+  // mod deltas (union of both items' mod keys)
+  const keys = new Set([...Object.keys(item.mods || {}), ...Object.keys(cur && cur.mods || {})]);
+  for (const k of keys) {
+    const d = (item.mods?.[k] || 0) - (cur && cur.mods?.[k] || 0);
+    if (d === 0) continue;
+    const sign = d > 0 ? '+' : '';
+    parts.push(`<span class="${d > 0 ? 'cmp-up' : 'cmp-down'}">${sign}${d}${PCT_STATS.has(k) ? '%' : ''} ${STAT_LABELS[k] || k}</span>`);
+  }
+  // weapon average-damage delta
+  if (item.weapon) {
+    const avg = w => w ? (w.damage[0] + w.damage[1]) / 2 : 0;
+    const d = Math.round(avg(item.weapon) - avg(cur && cur.weapon));
+    if (d !== 0) {
+      const sign = d > 0 ? '+' : '';
+      parts.push(`<span class="${d > 0 ? 'cmp-up' : 'cmp-down'}">${sign}${d} DMG</span>`);
+    }
+  }
+  return parts.length ? parts.join('') : '<span class="cmp-same">— no change —</span>';
+}
+
+function buyEquipOffer(i) {
+  const o = shopEquipOffers[i];
+  if (!o || o.sold) return;
+  if (!canEquip(o.item, player.equipment)) return; // shield vs 2H
+  const price = itemPrice(o.item);
+  if (gold < price) return;
+  gold -= price;
+  o.sold = true;
+  equipItem(o.item);
   Sfx.play('buy');
   updateHUD();
   renderShop();

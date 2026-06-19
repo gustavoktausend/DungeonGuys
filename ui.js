@@ -91,7 +91,8 @@ const ITEM_POOL = [
   { name: 'FROST RUNE',      icon: '❄', price: 28, mods: { chill: 18 } },
 ];
 
-let shopOffers = [];
+let shopOffers = [];      // consumable offers (ITEM_POOL)
+let shopEquipOffers = []; // equipment offers (EQUIPMENT)
 let rerollCost = 5;
 const HEAL_PRICE = 10;
 
@@ -213,6 +214,11 @@ document.getElementById('shop-items').addEventListener('click', e => {
   if (e.detail === 0) return;
   const btn = e.target.closest('.shop-item[data-i]');
   if (btn) buyOffer(Number(btn.dataset.i));
+});
+document.getElementById('shop-equip').addEventListener('click', e => {
+  if (e.detail === 0) return;
+  const btn = e.target.closest('.shop-item[data-i]');
+  if (btn) buyEquipOffer(Number(btn.dataset.i));
 });
 
 // ─── Class unlocks & records ──────────────────────────────────────────────────

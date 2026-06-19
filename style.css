@@ -754,6 +754,50 @@ html, body {
 }
 .shop-item.small span { color: var(--gold-coin); }
 
+/* ─── Shop: equipment section ──────────────────────────── */
+.shop-left { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+
+.shop-section-label {
+  font-family: var(--display-font);
+  font-size: clamp(12px, 1.7vw, 15px);
+  color: var(--gold);
+  letter-spacing: 0.2em;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.shop-slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.slot-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 4px;
+  border: 1px solid var(--bronze);
+  background: linear-gradient(180deg, #1b130b, #120c07);
+  min-width: 0;
+}
+.slot-chip.empty { opacity: 0.45; }
+.slot-chip .slot-ico { font-size: clamp(14px, 2.2vw, 20px); line-height: 1; }
+.slot-chip .slot-lbl {
+  font-family: var(--pixel-font);
+  font-size: clamp(8px, 1.2vw, 11px);
+  color: var(--parchment);
+  text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+
+.shop-equip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cmp-up   { color: var(--hp-green); font-size: clamp(10px, 1.4vw, 13px); }
+.cmp-down { color: var(--hp-low);   font-size: clamp(10px, 1.4vw, 13px); }
+.cmp-same { color: rgba(232,220,200,0.5); font-size: clamp(10px, 1.4vw, 13px); }
+
 /* ─── Game Over Screen ─────────────────────────────────── */
 .gameover-title {
   font-family: var(--display-font);
