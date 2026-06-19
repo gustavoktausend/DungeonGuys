@@ -1,4 +1,4 @@
-// items.js — shop flow, potions, chests, floating text, weapon upgrade drops
+// items.js — shop flow, potions, chests, floating text
 // ─── Shop flow ────────────────────────────────────────────────────────────────
 function openShop() {
   if (gameState === 'levelup') { pendingAfterLevelUp = 'shop'; return; }

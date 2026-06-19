@@ -256,7 +256,6 @@ function startNextWave() {
   comboTimer = 0;
 
   // leftover floor loot from the last wave is swept away
-  // (weapon upgrades stay — they're core progression)
   coins   = [];
   potions = [];
   chests  = [];

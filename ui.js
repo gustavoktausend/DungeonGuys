@@ -42,8 +42,8 @@ function recalcStats() {
 
 // the weapon a class starts a run with (tier 0 of its definition for now;
 // the catalog of buyable weapons arrives in Phase 3)
-function startWeapon(cls) {
-  return CLASS_DEFS[cls].tiers[0];
+function startWeapon(classKey) {
+  return CLASS_DEFS[classKey].tiers[0];
 }
 
 // ─── Stamina / sprint ─────────────────────────────────────────────────────────

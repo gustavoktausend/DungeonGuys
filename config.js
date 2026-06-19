@@ -245,7 +245,7 @@ function drawSprite(frame, x, y, flip, scale = SPRITE_SCALE, sheet = SHEET) {
 }
 
 // ─── Classes (Brotato-style) ──────────────────────────────────────────────────
-// Each class has 3 weapon tiers; an upgrade pickup drops every 2 waves.
+// Each class has 3 weapon tiers; tier 0 is the starting weapon (tiers 1-2 become shop weapons in a later phase).
 const CLASS_DEFS = {
   mage: {
     hp: 100, speed: 2.6, anim: 'wizzard',
