@@ -72,7 +72,8 @@ function gainXp(amount) {
     player.xp -= player.xpNext;
     player.xpNext = Math.round(player.xpNext * XP_GROWTH);
     player.level++;
-    player.maxHp += LEVEL_HP;
+    player.permMaxHp += LEVEL_HP;
+    recalcStats();
     player.hp = Math.min(player.maxHp, player.hp + LEVEL_HP);
     pendingLevelUps++;
     if (player.level >= 8) tryUnlock('witch');

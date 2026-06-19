@@ -176,13 +176,10 @@ function startGame() {
     x: canvas.width  / 2,
     y: canvas.height / 2,
     w: 20, h: 20,
-    hp: cls.hp, maxHp: cls.hp,
     speed: cls.speed,
     cls: selectedClass,
     def: cls,
-    weapon: cls.tiers[0],
     specialTimer: 0,
-    stats: baseStats(),
     regenAcc: 0,
     name: heroName(),
     level: 1,
@@ -197,12 +194,21 @@ function startGame() {
     walkTimer: 0,
   };
 
-  // forge perks
-  player.maxHp += forgeLevel('vigor') * 10;
-  player.hp     = player.maxHp;
-  player.stats.dmgPct   += forgeLevel('honed') * 2;
-  player.stats.speedPct += forgeLevel('fleet') * 2;
+  // equipment slots + the permanent stat layer
+  player.equipment = emptyEquipment();
+  player.equipment.weapon = startWeapon(selectedClass);
+  player.weapon    = player.equipment.weapon; // combat/render read player.weapon
+  player.permStats = baseStats();
+  player.permMaxHp = cls.hp;
+
+  // forge perks feed the permanent layer
+  player.permMaxHp          += forgeLevel('vigor') * 10;
+  player.permStats.dmgPct   += forgeLevel('honed') * 2;
+  player.permStats.speedPct += forgeLevel('fleet') * 2;
   gold += forgeLevel('startgold') * 15;
+
+  recalcStats();
+  player.hp = player.maxHp;
 
   hideAllScreens();
   hud.classList.remove('hidden');

@@ -32,6 +32,20 @@ function baseStats() {
   };
 }
 
+// derives player.stats / player.maxHp from the permanent layer + equipped gear.
+// call after any change to permStats, permMaxHp, or player.equipment.
+function recalcStats() {
+  player.stats  = computeEffectiveStats(player.permStats, player.equipment);
+  player.maxHp  = effectiveMaxHp(player.permMaxHp, player.equipment);
+  if (player.hp > player.maxHp) player.hp = player.maxHp;
+}
+
+// the weapon a class starts a run with (tier 0 of its definition for now;
+// the catalog of buyable weapons arrives in Phase 3)
+function startWeapon(cls) {
+  return CLASS_DEFS[cls].tiers[0];
+}
+
 // ─── Stamina / sprint ─────────────────────────────────────────────────────────
 const STAMINA_BASE    = 100;
 const SPRINT_MULT     = 1.55; // speed while sprinting

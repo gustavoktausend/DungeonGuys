@@ -25,16 +25,20 @@ function rollOffers() {
   shopOffers = picks.map(it => ({ item: it, sold: false }));
 }
 
+// permanent stat changes (blessings, shop consumables) feed the permanent layer;
+// recalcStats() then re-derives the effective player.stats / player.maxHp.
 function applyMods(mods) {
+  let heal = 0;
   for (const [k, v] of Object.entries(mods)) {
     if (k === 'maxHp') {
-      player.maxHp = Math.max(30, player.maxHp + v); // items can't kill you
-      if (v > 0) player.hp += v;
-      else player.hp = Math.min(player.hp, player.maxHp);
+      player.permMaxHp = Math.max(30, player.permMaxHp + v);
+      if (v > 0) heal += v; // gaining permanent max HP also heals that much
     } else {
-      player.stats[k] += v;
+      player.permStats[k] = (player.permStats[k] || 0) + v;
     }
   }
+  recalcStats();
+  if (heal) player.hp = Math.min(player.maxHp, player.hp + heal);
 }
 
 function fmtMod(k, v) {
