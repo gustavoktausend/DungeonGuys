@@ -253,6 +253,11 @@ function drawEnemies() {
     ctx.filter = 'none';
 
     // HP bar (bosses use the big top bar instead)
+    // elite champions wear a pulsing colored halo
+    if (e.elite) {
+      ctx.shadowColor = e.eliteTint;
+      ctx.shadowBlur  = 12 + Math.sin(performance.now() / 220 + e.x) * 6;
+    }
     if (!e.boss && e.hp < e.maxHp) {
       const bw = e.w + 6;
       const bx = e.x - bw / 2;

@@ -164,6 +164,9 @@ function startGame() {
   pendingAfterLevelUp = null;
   runKills      = 0;
   runGoldEarned = 0;
+  combo         = 0;
+  comboTimer    = 0;
+  waveMutator   = null;
 
   recolorPlayerSheet(); // make sure the chosen outfit color is baked in
   buildTileMap();
@@ -245,6 +248,8 @@ function startNextWave() {
   wave++;
   waveActive = true;
   waveTimer  = 0;
+  combo      = 0; // streak doesn't carry across the shop break
+  comboTimer = 0;
 
   // leftover floor loot from the last wave is swept away
   // (weapon upgrades stay — they're core progression)

@@ -46,7 +46,7 @@ const STAT_LABELS = {
   dodge: 'DODGE', range: 'RANGE', speedPct: 'SPEED', luck: 'LUCK',
   stamina: 'STAMINA', maxHp: 'MAX HP',
 };
-const PCT_STATS = new Set(['dmgPct', 'atkSpeedPct', 'speedPct', 'crit', 'dodge', 'lifeSteal', 'luck']);
+const PCT_STATS = new Set(['dmgPct', 'atkSpeedPct', 'speedPct', 'crit', 'dodge', 'lifeSteal', 'luck', 'burn', 'chill']);
 
 // ─── Shop items (4 random offers per wave; some have downsides) ───────────────
 // dmgKind restricts the offer to classes using that damage type (no dead picks)
@@ -90,6 +90,9 @@ let shakeT = 0, shakeMag = 0; // screen shake timer/magnitude
 let waveHasBoss = false;
 
 function addShake(mag, dur = 220) {
+let combo = 0, comboTimer = 0;       // kill-streak score multiplier
+const COMBO_WINDOW = 3000;           // ms before the streak lapses
+function comboMult() { return Math.min(3, 1 + Math.floor(combo / 5) * 0.25); }
   shakeMag = Math.max(shakeMag, mag);
   shakeT   = Math.max(shakeT, dur);
 }
@@ -125,6 +128,7 @@ const finalGold    = document.getElementById('final-gold');
 // buttons drop focus after click so Space (attack key) never re-activates them
 document.addEventListener('click', e => {
   const btn = e.target.closest('button');
+  stats:    document.getElementById('stats-screen'),
   if (btn) { btn.blur(); Sfx.play('click'); }
 });
 
@@ -502,6 +506,41 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 
 // which bosses (if any) spawn on this wave
 function bossPlanForWave(w) {
+// ─── Lifetime stats screen ────────────────────────────────────────────────────
+function renderStats() {
+  const p = Save.data.progress;
+  const total = Object.keys(CLASS_DEFS).length;
+  // a class is playable unless it has an unmet unlock requirement
+  // (CopRobô has no UNLOCKS entry, so it counts even though it isn't in `unlocked`)
+  const playable = Object.keys(CLASS_DEFS).filter(c => !UNLOCKS[c] || Save.isUnlocked(c)).length;
+  const lifetime = [
+    ['TOTAL RUNS',   p.runs       || 0],
+    ['VICTORIES',    p.victories  || 0],
+    ['TOTAL KILLS',  p.kills      || 0],
+    ['BOSSES SLAIN', p.bossKills  || 0],
+    ['GOLD EARNED',  p.goldEarned || 0],
+    ['SOUL GOLD',    p.soulGold   || 0],
+    ['CLASSES',      playable + '/' + total],
+  ];
+  document.getElementById('stats-lifetime').innerHTML = lifetime
+    .map(([l, v]) => `<div class="stat-row"><span>${l}</span><span>${v}</span></div>`).join('');
+
+  document.getElementById('stats-classes').innerHTML = Object.keys(CLASS_DEFS).map(cls => {
+    const r = Save.classRecord(cls);
+    const val = r
+      ? [r.wave ? `W${r.wave}` : null, r.ewave ? `∞${r.ewave}` : null,
+         `${r.score}pts`, r.victories ? `${r.victories}🏆` : null].filter(Boolean).join(' · ')
+      : '—';
+    return `<div class="stat-row"><span>${cls.toUpperCase()}</span><span>${val}</span></div>`;
+  }).join('');
+}
+
+document.getElementById('btn-stats').addEventListener('click', mouseOnly(() => {
+  renderStats();
+  showScreen('stats');
+}));
+document.getElementById('btn-stats-close').addEventListener('click', mouseOnly(() => showScreen('start')));
+
   if (BOSS_WAVES[w]) return [BOSS_WAVES[w]]; // fixed bosses at 8 and 16
   if (gameMode !== 'endless' || w <= WAVES_TOTAL) return [];
   // endless past 16: guaranteed every 8th wave, otherwise a 20% roll —

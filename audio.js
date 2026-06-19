@@ -6,6 +6,7 @@ const Sfx = (() => {
   let muted = false;
   let musicOn = false;
   let musicTimer = null;
+  let bossMode = false; // swaps to a louder, grittier pattern during boss fights
   let noiseBuf = null;
   let step = 0;
   let nextNoteTime = 0;
@@ -127,12 +128,27 @@ const Sfx = (() => {
     0, 0, 415.30, 0,  523.25, 0, 0, 622.25,  0, 0, 587.33, 0,  493.88, 0, 0, 0,
   ];
 
+  // boss variant: lower, driving bass + a more frantic lead
+  const BASS_BOSS = [
+    55.00, 0, 55.00, 0,  55.00, 0, 65.41, 0,  58.27, 0, 58.27, 0,  43.65, 0, 49.00, 0,
+    55.00, 0, 55.00, 0,  55.00, 0, 65.41, 0,  73.42, 0, 69.30, 0,  65.41, 0, 61.74, 0,
+  ];
+  const LEAD_BOSS = [
+    440.00, 0, 523.25, 0,  659.25, 0, 523.25, 0,  440.00, 0, 415.30, 0,  493.88, 0, 0, 0,
+    587.33, 0, 523.25, 0,  659.25, 0, 783.99, 0,  698.46, 0, 659.25, 0,  587.33, 0, 0, 0,
+  ];
   function scheduleStep(s, at) {
-    const b = BASS[s % BASS.length];
-    if (b) tone({ freq: b, type: 'triangle', dur: STEP * 1.8, vol: 0.5, at, dest: musicGain });
-    const l = LEAD[s % LEAD.length];
-    if (l) tone({ freq: l, type: 'square', dur: STEP * 1.1, vol: 0.14, at, dest: musicGain });
-    if (s % 4 === 2) noise({ dur: 0.03, vol: 0.05, freq: 6000, at, dest: musicGain }); // hat
+    const bass = bossMode ? BASS_BOSS : BASS;
+    const lead = bossMode ? LEAD_BOSS : LEAD;
+    const b = bass[s % bass.length];
+    if (b) tone({ freq: b, type: bossMode ? 'sawtooth' : 'triangle',
+                  dur: STEP * 1.8, vol: bossMode ? 0.55 : 0.5, at, dest: musicGain });
+    const l = lead[s % lead.length];
+    if (l) tone({ freq: l, type: 'square', dur: STEP * 1.1,
+                  vol: bossMode ? 0.17 : 0.14, at, dest: musicGain });
+    // boss fights get a busier hi-hat (every other step vs every 4th)
+    if (bossMode ? (s % 2 === 0) : (s % 4 === 2))
+      noise({ dur: 0.03, vol: 0.05, freq: 6000, at, dest: musicGain });
   }
 
   function startMusic() {

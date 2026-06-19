@@ -74,6 +74,7 @@ function renderShop() {
 
   // stats panel
   const st = player.stats;
+  // only surface stats the player actually has — zeros are just noise
   const rows = [['MAX HP', player.maxHp], ['HP', Math.ceil(player.hp)]]
     .concat(Object.keys(st).map(k => [
       STAT_LABELS[k],
@@ -253,12 +254,27 @@ function updateHUD() {
   spBar.style.width = spPct + '%';
   spBar.classList.toggle('ready', spPct >= 100);
 
+  // mirror the special cooldown onto the mobile button (radial sweep + glow)
+  const touchSp = document.getElementById('btn-touch-special');
+  touchSp.style.setProperty('--cd', (100 - spPct).toFixed(0));
+  touchSp.classList.toggle('ready', spPct >= 100);
+
   const staPct = player.stamina / maxStamina() * 100;
   stBar.style.width = staPct + '%';
   stBar.classList.toggle('recovering', !player.sprinting && staPct < 100);
 
   document.getElementById('hud-name').textContent = player.name + ' · LV ' + player.level;
   document.getElementById('xp-bar').style.width = (player.xp / player.xpNext * 100) + '%';
+
+  // kill-streak combo indicator (only once it actually multiplies score)
+  const comboEl = document.getElementById('combo-display');
+  const mult = comboMult();
+  if (combo >= 5 && comboTimer > 0) {
+    comboEl.classList.remove('hidden');
+    comboEl.textContent = '×' + mult.toFixed(2).replace(/\.?0+$/, '') + ' COMBO';
+  } else {
+    comboEl.classList.add('hidden');
+  }
 
   // wave countdown (boss waves don't expire)
   const timerEl = document.getElementById('wave-timer');

@@ -28,6 +28,33 @@ const WAVE_DURATION = 30000; // survive this long and the wave is cleared (boss 
 // ─── XP / leveling ────────────────────────────────────────────────────────────
 const XP_BASE     = 100;  // xp needed for level 2
 const XP_GROWTH   = 1.4;  // each level needs 40% more
+// ─── Elite / champion modifiers ───────────────────────────────────────────────
+// rolled onto normal mobs from wave 3+; glow aura + buffed stats + extra loot
+const ELITE_TYPES = {
+  swift:    { name: 'SWIFT',    tint: '#5dade2', hp: 1.2, speed: 1.6 },
+  brutish:  { name: 'BRUTISH',  tint: '#e67e22', hp: 2.2, dmg: 1.5, scaleUp: 1.25 },
+  vampiric: { name: 'VAMPIRIC', tint: '#27ae60', hp: 1.6, regen: 7 }, // HP/s
+};
+
+function makeElite(e) {
+  const keys = Object.keys(ELITE_TYPES);
+  const key  = keys[Math.floor(Math.random() * keys.length)];
+  const t    = ELITE_TYPES[key];
+  e.elite     = key;
+  e.eliteTint = t.tint;
+  e.eliteName = t.name;
+  e.maxHp = Math.round(e.maxHp * (t.hp || 1));
+  e.hp    = e.maxHp;
+  if (t.speed)   e.speed *= t.speed;
+  if (t.dmg)     e.dmg = Math.round(e.dmg * t.dmg);
+  if (t.regen)   e.regen = t.regen;
+  if (t.scaleUp) e.scale *= t.scaleUp;
+  e.score        = Math.round(e.score * 2.5);
+  e.goldDrop     = Math.round(e.goldDrop * 2.5);
+  e.potionChance = Math.min(1, e.potionChance + 0.2);
+  return e;
+}
+
 const LEVEL_HP    = 10;   // max HP gained per level (also healed)
 
 function gainXp(amount) {
@@ -141,7 +168,17 @@ function spawnEnemy(type) {
   else                 { x = PLAY.left + pad; y = ry(); }
   spawnParticles(x, y, '#9b59b6', 8);
 
-  enemies.push(makeEnemy(type, x, y));
+  const e = makeEnemy(type, x, y);
+  // elite chance grows with the wave; the ELITE HUNT mutator floods them
+  const eliteChance = waveMutator === 'elite'
+    ? Math.min(0.65, 0.12 * wave)
+    : Math.min(0.28, 0.05 * wave);
+  if (wave >= 3 && type !== 'mimic' && Math.random() < eliteChance) {
+    makeElite(e);
+    addFloatText(e.x, e.y - e.h / 2 - 14, e.eliteName, e.eliteTint);
+    spawnParticles(e.x, e.y, e.eliteTint, 12);
+  }
+  enemies.push(e);
 }
 
 function makeEnemy(type, x, y) {
@@ -180,6 +217,10 @@ function makeEnemy(type, x, y) {
     chargeDir: { x: 0, y: 0 },
     enraged: false,
   };
+    moving: false,
+    elite: null,
+    eliteTint: null,
+    regen: 0,
 }
 
 // exploder went off by itself: no loot, no xp — just the blast
@@ -292,6 +333,12 @@ function updateEnemies(dt) {
           vy: Math.sin(a) * e.shooter.bulletSpeed,
           dmg: e.shooter.dmg,
           dist: 0,
+    // vampiric elites slowly knit themselves back together
+    if (e.regen > 0 && e.hp > 0 && e.hp < e.maxHp) {
+      e.hp = Math.min(e.maxHp, e.hp + e.regen * dt / 1000);
+      if (Math.random() < dt * 0.004) spawnParticles(e.x, e.y, '#27ae60', 1);
+    }
+
           dead: false,
         });
         Sfx.play('eshoot');
@@ -336,7 +383,10 @@ function updateEnemies(dt) {
 
 function killEnemy(e) {
   e.dead = true;
-  score += e.score;
+  // kill-streak multiplier rewards aggressive play (xp stays on the base value)
+  combo++;
+  comboTimer = COMBO_WINDOW;
+  score += Math.round(e.score * comboMult());
   runKills++;
   gainXp(e.score); // xp mirrors score value
   Sfx.play(e.boss ? 'explosion' : 'death');
@@ -375,6 +425,8 @@ function enemyColor(type) {
 }
 
 // Coins
+    // last boss down? ease the music back to its normal theme
+    if (!enemies.some(x => x.boss && !x.dead)) Sfx.setBossMode(false);
 function updateCoins(dt) {
   const factor = dt / 16.67;
   for (const c of coins) {

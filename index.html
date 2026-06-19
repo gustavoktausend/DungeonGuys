@@ -68,6 +68,7 @@
           <button class="mode-btn selected" data-mode="campaign">⚔ CAMPAIGN — 16 WAVES</button>
           <button class="mode-btn" data-mode="endless">∞ ENDLESS</button>
           <button id="btn-forge" class="mode-btn forge-btn">⚒ FORGE · <span id="forge-gold">0</span></button>
+          <button id="btn-stats" class="mode-btn forge-btn">📊 STATS</button>
         </div>
         <div class="name-picker">
           <div class="color-label">— HERO NAME —</div>
@@ -138,6 +139,17 @@
         <div class="levelup-sub forge-hint">25% OF EACH RUN'S GOLD IS FORGED FOREVER</div>
         <div id="forge-list" class="forge-list"></div>
         <button id="btn-forge-close" class="btn-pixel secondary">✕ CLOSE</button>
+      </div>
+    </div>
+
+    <!-- STATS SCREEN (lifetime totals + per-class bests) -->
+    <div id="stats-screen" class="screen">
+      <div class="screen-inner compact">
+        <div class="shop-title">📊 STATS</div>
+        <div id="stats-lifetime" class="stats-block"></div>
+        <div class="levelup-sub">— BEST PER CLASS —</div>
+        <div id="stats-classes" class="stats-block"></div>
+        <button id="btn-stats-close" class="btn-pixel secondary">✕ CLOSE</button>
       </div>
     </div>
 
@@ -227,6 +239,7 @@
       <div class="hud-label">WAVE</div>
       <div id="wave-display">1</div>
       <div id="wave-timer">30</div>
+      <div id="combo-display" class="hidden"></div>
     </div>
     <div id="hud-right">
       <div class="hud-label">SCORE</div>

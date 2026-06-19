@@ -2,6 +2,7 @@
 // ─── Update ───────────────────────────────────────────────────────────────────
 function update(dt) {
   if (shakeT > 0) { shakeT -= dt; if (shakeT <= 0) shakeMag = 0; }
+  if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
   updatePlayer(dt);
   updateBullets(dt);
   updateEnemyBullets(dt);
