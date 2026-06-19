@@ -260,8 +260,18 @@ function startNextWave() {
 
   const bossPlan = bossPlanForWave(wave);
   waveHasBoss = bossPlan.length > 0;
+  Sfx.setBossMode(waveHasBoss); // swell the music for boss waves
+
+  // roll a wave mutator on ordinary waves (boss waves are spectacle enough)
+  waveMutator = null;
+  if (!waveHasBoss && wave >= 3 && Math.random() < 0.4) {
+    const keys = Object.keys(MUTATORS);
+    waveMutator = keys[Math.floor(Math.random() * keys.length)];
+  }
+
   // boss waves have a smaller escort so the boss is the show
-  const count = waveHasBoss ? 8 + Math.max(0, Math.floor((wave - WAVES_TOTAL) / 2)) : 4 + wave * 3;
+  let count = waveHasBoss ? 8 + Math.max(0, Math.floor((wave - WAVES_TOTAL) / 2)) : 4 + wave * 3;
+  if (waveMutator === 'swarm') count = Math.round(count * 1.6);
   spawnQueue = [];
   for (let i = 0; i < count; i++) {
     spawnQueue.push({
@@ -283,6 +293,9 @@ function startNextWave() {
       announceWave(gameMode === 'campaign' && wave === WAVES_TOTAL
         ? `☠ FINAL BOSS: ${name} ☠` : `☠ BOSS: ${name} ☠`);
     }
+  } else if (waveMutator) {
+    announceWave(`WAVE ${wave} · ${MUTATORS[waveMutator].name}`);
+    addFloatText(player.x, player.y - 44, MUTATORS[waveMutator].desc, '#66ccff');
   } else {
     announceWave(`— WAVE ${wave} —`);
   }

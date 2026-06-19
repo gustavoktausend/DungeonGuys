@@ -19,15 +19,15 @@ const ENEMY_DEFS = {
   ogre_warlord: { hp: 3200, speed: 0.9,  w: 76, h: 92, score: 1500, gold: 50, anim: 'ogre',       potion: 1, dmg: 22,
                   boss: 'OGRE WARLORD', scale: 3, summons: ['demon', 'brute'],
                   abilities: { charge: 8000, ring: 7000 } },
+  // mini-bosses (waves 4 and 12) — smaller than the act bosses, still must die
+  goblin_chief: { hp: 600,  speed: 1.5,  w: 40, h: 40, score: 250, gold: 15, anim: 'goblin',      potion: 1, dmg: 12,
+                  boss: 'GOBLIN CHIEFTAIN', scale: 2.4, summons: ['goblin'],
+                  abilities: { charge: 6000 } },
+  necro_lord:   { hp: 1300, speed: 0.85, w: 38, h: 56, score: 600, gold: 20, anim: 'necromancer', potion: 1, dmg: 12,
+                  boss: 'NECRO LORD', scale: 2.3, summons: ['skeleton'],
+                  shooter: { range: 320, interval: 1500, bulletSpeed: 5, dmg: 12 } },
 };
 
-const WAVES_TOTAL   = 16;
-const BOSS_WAVES    = { 8: 'zombie_king', 16: 'ogre_warlord' };
-const WAVE_DURATION = 30000; // survive this long and the wave is cleared (boss waves excluded)
-
-// ─── XP / leveling ────────────────────────────────────────────────────────────
-const XP_BASE     = 100;  // xp needed for level 2
-const XP_GROWTH   = 1.4;  // each level needs 40% more
 // ─── Elite / champion modifiers ───────────────────────────────────────────────
 // rolled onto normal mobs from wave 3+; glow aura + buffed stats + extra loot
 const ELITE_TYPES = {
@@ -55,6 +55,14 @@ function makeElite(e) {
   return e;
 }
 
+const WAVES_TOTAL   = 16;
+const BOSS_WAVES    = { 8: 'zombie_king', 16: 'ogre_warlord' };
+const MINIBOSS_WAVES = { 4: 'goblin_chief', 12: 'necro_lord' };
+const WAVE_DURATION = 30000; // survive this long and the wave is cleared (boss waves excluded)
+
+// ─── XP / leveling ────────────────────────────────────────────────────────────
+const XP_BASE     = 100;  // xp needed for level 2
+const XP_GROWTH   = 1.4;  // each level needs 40% more
 const LEVEL_HP    = 10;   // max HP gained per level (also healed)
 
 function gainXp(amount) {
@@ -92,6 +100,8 @@ const LEVELUP_POOL = [
   { name: 'SHARPNESS',   icon: '🗡', dmgKind: 'melee',     mods: { meleeDmg: 2 } },
   { name: 'PIERCING',    icon: '🏹', dmgKind: 'arrow',     mods: { rangedDmg: 2 } },
   { name: 'SORCERY',     icon: '🔥', dmgKind: 'elemental', mods: { elementalDmg: 2 } },
+  { name: 'IGNITE',      icon: '🔥', mods: { burn: 12 } },
+  { name: 'FROST',       icon: '❄', mods: { chill: 15 } },
 ];
 
 let pendingLevelUps     = 0;
@@ -183,14 +193,21 @@ function spawnEnemy(type) {
 
 function makeEnemy(type, x, y) {
   const def = ENEMY_DEFS[type];
-  const hp  = def.hp + Math.floor(wave * def.hp * 0.12);
+  let hp = def.hp + Math.floor(wave * def.hp * 0.12);
+  // speed ramps with the wave but is capped so deep endless stays fair/playable
+  let speed = def.speed + Math.min(wave, 30) * 0.04;
+  let goldDrop = def.gold;
+  // wave mutators tweak the stat line (bosses ignore swarm's HP cut)
+  if (waveMutator === 'swarm' && !def.boss) hp = Math.round(hp * 0.7);
+  if (waveMutator === 'frenzy')             speed *= 1.35;
+  if (waveMutator === 'bounty')             goldDrop *= 2;
   return {
     x, y,
     w: def.w, h: def.h,
     hp, maxHp: hp,
-    speed: def.speed + wave * 0.04,
+    speed,
     score: def.score,
-    goldDrop: def.gold,
+    goldDrop,
     potionChance: def.potion,
     dmg: def.dmg,
     boss: def.boss || null,
@@ -200,9 +217,15 @@ function makeEnemy(type, x, y) {
     type,
     anim: def.anim,
     dead: false,
+    moving: false,
+    elite: null,
+    eliteTint: null,
+    regen: 0,
     hitFlash: 0,
     poisonT: 0,
     poisonDps: 0,
+    burnT: 0,
+    burnDps: 0,
     slowT: 0,
     shooter: def.shooter || null,
     shootT: 0,
@@ -217,10 +240,6 @@ function makeEnemy(type, x, y) {
     chargeDir: { x: 0, y: 0 },
     enraged: false,
   };
-    moving: false,
-    elite: null,
-    eliteTint: null,
-    regen: 0,
 }
 
 // exploder went off by itself: no loot, no xp — just the blast
@@ -264,6 +283,11 @@ function applyPoison(e, dps, dur) {
   e.poisonT   = Math.max(e.poisonT, dur);
 }
 
+function applyBurn(e, dps, dur) {
+  e.burnDps = Math.max(e.burnDps, dps);
+  e.burnT   = Math.max(e.burnT, dur);
+}
+
 function spawnBoss(type, index = 0, total = 1) {
   const x = canvas.width / 2 + (index - (total - 1) / 2) * 140;
   const e = makeEnemy(type, x, PLAY.top + 60);
@@ -299,8 +323,21 @@ function updateEnemies(dt) {
       if (Math.random() < dt * 0.008) spawnParticles(e.x, e.y, '#2ecc71', 2);
       if (e.hp <= 0) { killEnemy(e); continue; }
     }
+    // burn: fire damage-over-time (orange embers)
+    if (e.burnT > 0) {
+      e.burnT -= dt;
+      e.hp -= e.burnDps * dt / 1000;
+      if (Math.random() < dt * 0.01) spawnParticles(e.x, e.y, '#ff6600', 2);
+      if (e.hp <= 0) { killEnemy(e); continue; }
+    }
     if (e.slowT > 0) e.slowT -= dt;
     const slowMult = e.slowT > 0 ? 0.6 : 1;
+
+    // vampiric elites slowly knit themselves back together
+    if (e.regen > 0 && e.hp > 0 && e.hp < e.maxHp) {
+      e.hp = Math.min(e.maxHp, e.hp + e.regen * dt / 1000);
+      if (Math.random() < dt * 0.004) spawnParticles(e.x, e.y, '#27ae60', 1);
+    }
 
     const dx = player.x - e.x;
     const dy = player.y - e.y;
@@ -333,12 +370,6 @@ function updateEnemies(dt) {
           vy: Math.sin(a) * e.shooter.bulletSpeed,
           dmg: e.shooter.dmg,
           dist: 0,
-    // vampiric elites slowly knit themselves back together
-    if (e.regen > 0 && e.hp > 0 && e.hp < e.maxHp) {
-      e.hp = Math.min(e.maxHp, e.hp + e.regen * dt / 1000);
-      if (Math.random() < dt * 0.004) spawnParticles(e.x, e.y, '#27ae60', 1);
-    }
-
           dead: false,
         });
         Sfx.play('eshoot');
@@ -388,12 +419,14 @@ function killEnemy(e) {
   comboTimer = COMBO_WINDOW;
   score += Math.round(e.score * comboMult());
   runKills++;
-  gainXp(e.score); // xp mirrors score value
+  gainXp(e.score); // xp mirrors base score value
   Sfx.play(e.boss ? 'explosion' : 'death');
   if (e.boss) {
     addShake(14, 500);
     Save.data.progress.bossKills++;
     Save.persist();
+    // last boss down? ease the music back to its normal theme
+    if (!enemies.some(x => x.boss && !x.dead)) Sfx.setBossMode(false);
     if (e.type === 'zombie_king') tryUnlock('priestess');
   }
   spawnParticles(e.x, e.y, enemyColor(e.type), 12);
@@ -425,8 +458,6 @@ function enemyColor(type) {
 }
 
 // Coins
-    // last boss down? ease the music back to its normal theme
-    if (!enemies.some(x => x.boss && !x.dead)) Sfx.setBossMode(false);
 function updateCoins(dt) {
   const factor = dt / 16.67;
   for (const c of coins) {

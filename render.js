@@ -23,8 +23,20 @@ function render() {
   drawEnemies();
   drawPlayer();
   drawParticles();
+  drawFog();
   drawFloatTexts();
   ctx.restore(); // shake transform
+}
+
+// FOG mutator: darkness closes in, leaving a lit circle around the hero
+function drawFog() {
+  if (waveMutator !== 'fog' || !player) return;
+  const r = 190;
+  const g = ctx.createRadialGradient(player.x, player.y, r * 0.45, player.x, player.y, r * 2.2);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.85)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
 // Tiles
@@ -237,9 +249,15 @@ function drawEnemies() {
   for (const e of enemies) {
     if (e.dead) continue;
 
-    const frame = ANIMS[e.anim].run[animTick];
+    const set   = ANIMS[e.anim][e.moving ? 'run' : 'idle'];
+    const frame = set[animTick];
     const flip  = player.x < e.x; // face the player
 
+    // elite champions wear a pulsing colored halo
+    if (e.elite) {
+      ctx.shadowColor = e.eliteTint;
+      ctx.shadowBlur  = 12 + Math.sin(performance.now() / 220 + e.x) * 6;
+    }
     if (e.hitFlash > 0) ctx.filter = 'brightness(2.5) saturate(40%)';
     else if (e.enraged) {
       ctx.filter = `saturate(2.2) hue-rotate(-25deg) brightness(${(1.15 + Math.sin(performance.now() / 90) * 0.15).toFixed(2)})`;
@@ -250,14 +268,10 @@ function drawEnemies() {
       if (strobe) ctx.filter = 'brightness(2.2) sepia(1) saturate(6) hue-rotate(-50deg)';
     }
     drawSprite(frame, e.x, e.y, flip, e.scale);
-    ctx.filter = 'none';
+    ctx.filter     = 'none';
+    ctx.shadowBlur = 0;
 
     // HP bar (bosses use the big top bar instead)
-    // elite champions wear a pulsing colored halo
-    if (e.elite) {
-      ctx.shadowColor = e.eliteTint;
-      ctx.shadowBlur  = 12 + Math.sin(performance.now() / 220 + e.x) * 6;
-    }
     if (!e.boss && e.hp < e.maxHp) {
       const bw = e.w + 6;
       const bx = e.x - bw / 2;

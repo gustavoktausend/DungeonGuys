@@ -76,7 +76,7 @@ function renderShop() {
   const st = player.stats;
   // only surface stats the player actually has — zeros are just noise
   const rows = [['MAX HP', player.maxHp], ['HP', Math.ceil(player.hp)]]
-    .concat(Object.keys(st).map(k => [
+    .concat(Object.keys(st).filter(k => st[k] !== 0).map(k => [
       STAT_LABELS[k],
       (st[k] > 0 ? '+' : '') + st[k] + (PCT_STATS.has(k) ? '%' : ''),
     ]));

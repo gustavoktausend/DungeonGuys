@@ -328,6 +328,14 @@ function dealDamage(e, [min, max], kind, fx, fy) {
     player.hp = Math.min(player.maxHp, player.hp + 1);
   }
 
+  // elemental procs: burn scales with the weapon's hit, chill briefly slows
+  if (st.burn > 0 && Math.random() < st.burn / 100) {
+    applyBurn(e, Math.max(6, Math.round(player.weapon.damage[0] * 0.15)), 3000);
+  }
+  if (st.chill > 0 && Math.random() < st.chill / 100) {
+    e.slowT = Math.max(e.slowT, 1500);
+  }
+
   if (e.hp <= 0) killEnemy(e);
 }
 

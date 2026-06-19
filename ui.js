@@ -27,6 +27,8 @@ function baseStats() {
     speedPct: 0,      // % move speed
     luck: 0,          // % more potion drops / chest spawns
     stamina: 0,       // flat bonus to the 100 base stamina pool
+    burn: 0,          // % chance on hit to set a fire DoT
+    chill: 0,         // % chance on hit to slow the enemy
   };
 }
 
@@ -44,7 +46,7 @@ const STAT_LABELS = {
   meleeDmg: 'MELEE DMG', rangedDmg: 'RANGED DMG', elementalDmg: 'ELEM DMG',
   atkSpeedPct: 'ATK SPEED', crit: 'CRIT', armor: 'ARMOR',
   dodge: 'DODGE', range: 'RANGE', speedPct: 'SPEED', luck: 'LUCK',
-  stamina: 'STAMINA', maxHp: 'MAX HP',
+  stamina: 'STAMINA', maxHp: 'MAX HP', burn: 'BURN', chill: 'CHILL',
 };
 const PCT_STATS = new Set(['dmgPct', 'atkSpeedPct', 'speedPct', 'crit', 'dodge', 'lifeSteal', 'luck', 'burn', 'chill']);
 
@@ -71,6 +73,8 @@ const ITEM_POOL = [
   { name: 'IRON GREAVES',    icon: '🥾', price: 30, mods: { armor: 2, stamina: -20 } },
   { name: 'TOWER SHIELD',    icon: '🏰', price: 36, mods: { armor: 5, atkSpeedPct: -8 } },
   { name: 'CURSED SKULL',    icon: '💀', price: 38, mods: { dmgPct: 15, maxHp: -10, hpRegen: -1 } },
+  { name: 'EMBER BRAND',     icon: '🔥', price: 30, mods: { burn: 15 } },
+  { name: 'FROST RUNE',      icon: '❄', price: 28, mods: { chill: 18 } },
 ];
 
 let shopOffers = [];
@@ -86,13 +90,25 @@ let score, gold, wave, waveTimer, waveActive;
 let nextWaveDelay = 3000;
 let spawnQueue   = [];
 let runKills = 0, runGoldEarned = 0;
-let shakeT = 0, shakeMag = 0; // screen shake timer/magnitude
-let waveHasBoss = false;
-
-function addShake(mag, dur = 220) {
 let combo = 0, comboTimer = 0;       // kill-streak score multiplier
 const COMBO_WINDOW = 3000;           // ms before the streak lapses
 function comboMult() { return Math.min(3, 1 + Math.floor(combo / 5) * 0.25); }
+let shakeT = 0, shakeMag = 0; // screen shake timer/magnitude
+let waveHasBoss = false;
+
+// ─── Wave mutators (rotating modifiers on non-boss waves) ─────────────────────
+const MUTATORS = {
+  swarm:  { name: 'SWARM',      desc: 'MORE BUT WEAKER FOES' },
+  frenzy: { name: 'FRENZY',     desc: 'FASTER ENEMIES' },
+  bounty: { name: 'BOUNTY',     desc: 'DOUBLE GOLD' },
+  elite:  { name: 'ELITE HUNT', desc: 'MANY CHAMPIONS' },
+  fog:    { name: 'FOG',        desc: 'LIMITED VISION' },
+};
+let waveMutator = null; // key into MUTATORS for the current wave, or null
+
+let screenShake = Save.data.settings.shake !== false; // off disables screen shake
+function addShake(mag, dur = 220) {
+  if (!screenShake) return;
   shakeMag = Math.max(shakeMag, mag);
   shakeT   = Math.max(shakeT, dur);
 }
@@ -112,6 +128,7 @@ const screens = {
   victory:  document.getElementById('victory-screen'),
   levelup:  document.getElementById('levelup-screen'),
   forge:    document.getElementById('forge-screen'),
+  stats:    document.getElementById('stats-screen'),
 };
 const hud          = document.getElementById('hud');
 const hpBar        = document.getElementById('hp-bar');
@@ -128,7 +145,6 @@ const finalGold    = document.getElementById('final-gold');
 // buttons drop focus after click so Space (attack key) never re-activates them
 document.addEventListener('click', e => {
   const btn = e.target.closest('button');
-  stats:    document.getElementById('stats-screen'),
   if (btn) { btn.blur(); Sfx.play('click'); }
 });
 
@@ -490,22 +506,6 @@ document.getElementById('forge-list').addEventListener('click', e => {
 });
 refreshForgeButton();
 
-// ─── Game mode (campaign 16 waves / endless) ──────────────────────────────────
-let gameMode = Save.data.settings.mode === 'endless' ? 'endless' : 'campaign';
-
-document.querySelectorAll('.mode-btn').forEach(btn => {
-  btn.classList.toggle('selected', btn.dataset.mode === gameMode);
-  btn.addEventListener('click', () => {
-    gameMode = btn.dataset.mode;
-    Save.data.settings.mode = gameMode;
-    Save.persist();
-    document.querySelectorAll('.mode-btn').forEach(b =>
-      b.classList.toggle('selected', b.dataset.mode === gameMode));
-  });
-});
-
-// which bosses (if any) spawn on this wave
-function bossPlanForWave(w) {
 // ─── Lifetime stats screen ────────────────────────────────────────────────────
 function renderStats() {
   const p = Save.data.progress;
@@ -541,7 +541,26 @@ document.getElementById('btn-stats').addEventListener('click', mouseOnly(() => {
 }));
 document.getElementById('btn-stats-close').addEventListener('click', mouseOnly(() => showScreen('start')));
 
-  if (BOSS_WAVES[w]) return [BOSS_WAVES[w]]; // fixed bosses at 8 and 16
+// ─── Game mode (campaign 16 waves / endless) ──────────────────────────────────
+let gameMode = Save.data.settings.mode === 'endless' ? 'endless' : 'campaign';
+
+// only real mode buttons carry data-mode; FORGE / STATS share the class but
+// must not be treated as a mode (clicking them used to blank out gameMode)
+document.querySelectorAll('.mode-btn[data-mode]').forEach(btn => {
+  btn.classList.toggle('selected', btn.dataset.mode === gameMode);
+  btn.addEventListener('click', () => {
+    gameMode = btn.dataset.mode;
+    Save.data.settings.mode = gameMode;
+    Save.persist();
+    document.querySelectorAll('.mode-btn').forEach(b =>
+      b.classList.toggle('selected', b.dataset.mode === gameMode));
+  });
+});
+
+// which bosses (if any) spawn on this wave
+function bossPlanForWave(w) {
+  if (BOSS_WAVES[w]) return [BOSS_WAVES[w]];          // act bosses at 8 and 16
+  if (MINIBOSS_WAVES[w]) return [MINIBOSS_WAVES[w]];  // mini-bosses at 4 and 12
   if (gameMode !== 'endless' || w <= WAVES_TOTAL) return [];
   // endless past 16: guaranteed every 8th wave, otherwise a 20% roll —
   // and deeper waves can stack more than one boss at once

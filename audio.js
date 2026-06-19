@@ -4,9 +4,10 @@ const Sfx = (() => {
   let master = null;
   let musicGain = null;
   let muted = false;
+  let vol = 0.5;       // master volume 0..1 (independent of mute)
   let musicOn = false;
-  let musicTimer = null;
   let bossMode = false; // swaps to a louder, grittier pattern during boss fights
+  let musicTimer = null;
   let noiseBuf = null;
   let step = 0;
   let nextNoteTime = 0;
@@ -127,7 +128,6 @@ const Sfx = (() => {
     0, 0, 440.00, 0,  523.25, 0, 0, 440.00,  0, 349.23, 0, 0,  440.00, 0, 0, 0,
     0, 0, 415.30, 0,  523.25, 0, 0, 622.25,  0, 0, 587.33, 0,  493.88, 0, 0, 0,
   ];
-
   // boss variant: lower, driving bass + a more frantic lead
   const BASS_BOSS = [
     55.00, 0, 55.00, 0,  55.00, 0, 65.41, 0,  58.27, 0, 58.27, 0,  43.65, 0, 49.00, 0,
@@ -137,6 +137,7 @@ const Sfx = (() => {
     440.00, 0, 523.25, 0,  659.25, 0, 523.25, 0,  440.00, 0, 415.30, 0,  493.88, 0, 0, 0,
     587.33, 0, 523.25, 0,  659.25, 0, 783.99, 0,  698.46, 0, 659.25, 0,  587.33, 0, 0, 0,
   ];
+
   function scheduleStep(s, at) {
     const bass = bossMode ? BASS_BOSS : BASS;
     const lead = bossMode ? LEAD_BOSS : LEAD;
