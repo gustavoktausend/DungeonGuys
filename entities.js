@@ -116,6 +116,11 @@ function playerDmgKind() {
        : 'elemental';
 }
 
+// the player's archetype bucket (melee | ranged | elemental), from the equipped weapon
+function playerArchetype() {
+  return archetypeOf(player.weapon.attack);
+}
+
 function maybeOpenLevelUp() {
   if (pendingLevelUps <= 0 || gameState !== 'playing') return;
   gameState = 'levelup';

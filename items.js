@@ -18,6 +18,13 @@ function closeShop() {
   animId = requestAnimationFrame(loop);
 }
 
+// places a bought item into its slot, syncs the active weapon, recalculates stats
+function equipItem(item) {
+  player.equipment = equipInto(player.equipment, item);
+  if (item.slot === 'weapon') player.weapon = player.equipment.weapon;
+  recalcStats();
+}
+
 function rollOffers() {
   const kind = playerDmgKind(); // melee | arrow (incl. bullets) | elemental
   const pool = ITEM_POOL.filter(it => !it.dmgKind || it.dmgKind === kind);
