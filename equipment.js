@@ -42,7 +42,51 @@ function effectiveMaxHp(permMaxHp, equipment) {
   return Math.max(30, permMaxHp + bonus);
 }
 
+// maps a weapon's attack type to its archetype bucket
+function archetypeOf(attack) {
+  if (attack === 'melee') return 'melee';
+  if (attack === 'arrow' || attack === 'bullet') return 'ranged';
+  return 'elemental';
+}
+
+// is this item usable by the given class/archetype?
+// weapons must match the archetype; classReq (if present) gates any item
+function isEligible(item, classKey, archetype) {
+  if (item.slot === 'weapon' && item.archetype !== archetype) return false;
+  if (item.classReq && !item.classReq.includes(classKey)) return false;
+  return true;
+}
+
+// first empty ring slot, or ring1 when both are full
+function resolveRingSlot(equipment) {
+  if (!equipment.ring1) return 'ring1';
+  if (!equipment.ring2) return 'ring2';
+  return 'ring1';
+}
+
+// the concrete slot key an item occupies (rings resolve to ring1/ring2)
+function targetSlot(item, equipment) {
+  return item.slot === 'ring' ? resolveRingSlot(equipment) : item.slot;
+}
+
+// a shield (offhand) cannot be equipped while a two-handed weapon is held
+function canEquip(item, equipment) {
+  if (item.slot === 'offhand' && equipment.weapon && equipment.weapon.twoHanded) return false;
+  return true;
+}
+
+// returns a NEW equipment object with item placed per the slot rules;
+// a two-handed weapon also clears the offhand. Never mutates the input.
+function equipInto(equipment, item) {
+  const next = { ...equipment };
+  const slot = targetSlot(item, next);
+  next[slot] = item;
+  if (item.slot === 'weapon' && item.twoHanded) next.offhand = null;
+  return next;
+}
+
 // expose for Node tests; harmless in the browser (no `module` global there)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { EQUIP_SLOTS, emptyEquipment, sumEquipmentMods, computeEffectiveStats, effectiveMaxHp };
+  module.exports = { EQUIP_SLOTS, emptyEquipment, sumEquipmentMods, computeEffectiveStats, effectiveMaxHp,
+                     archetypeOf, isEligible, resolveRingSlot, targetSlot, canEquip, equipInto };
 }
