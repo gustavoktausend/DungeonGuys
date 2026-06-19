@@ -141,9 +141,9 @@ function equipDelta(item) {
   const cur  = player.equipment[slot];
   const parts = [];
   // mod deltas (union of both items' mod keys)
-  const keys = new Set([...Object.keys(item.mods || {}), ...Object.keys(cur && cur.mods || {})]);
+  const keys = new Set([...Object.keys(item.mods ?? {}), ...Object.keys(cur?.mods ?? {})]);
   for (const k of keys) {
-    const d = (item.mods?.[k] || 0) - (cur && cur.mods?.[k] || 0);
+    const d = (item.mods?.[k] ?? 0) - (cur?.mods?.[k] ?? 0);
     if (d === 0) continue;
     const sign = d > 0 ? '+' : '';
     parts.push(`<span class="${d > 0 ? 'cmp-up' : 'cmp-down'}">${sign}${d}${PCT_STATS.has(k) ? '%' : ''} ${STAT_LABELS[k] || k}</span>`);
@@ -151,7 +151,7 @@ function equipDelta(item) {
   // weapon average-damage delta
   if (item.weapon) {
     const avg = w => w ? (w.damage[0] + w.damage[1]) / 2 : 0;
-    const d = Math.round(avg(item.weapon) - avg(cur && cur.weapon));
+    const d = Math.round(avg(item.weapon) - avg(cur?.weapon));
     if (d !== 0) {
       const sign = d > 0 ? '+' : '';
       parts.push(`<span class="${d > 0 ? 'cmp-up' : 'cmp-down'}">${sign}${d} DMG</span>`);
