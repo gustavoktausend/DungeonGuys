@@ -271,6 +271,12 @@ function damagePlayer(raw) {
     Sfx.play('dodge');
     return;
   }
+  // shield block: a flat chance (capped) to fully negate the hit
+  if (st.block > 0 && Math.random() < Math.min(75, st.block) / 100) {
+    addFloatText(player.x, player.y - 26, 'BLOCK', '#aab7c4');
+    Sfx.play('dodge');
+    return;
+  }
   const dmg = Math.max(1, Math.round(raw * (1 - st.armor / (st.armor + 15))));
   player.hp -= dmg;
   spawnParticles(player.x, player.y, '#ff0000', 8);

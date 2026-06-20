@@ -29,6 +29,7 @@ function baseStats() {
     stamina: 0,       // flat bonus to the 100 base stamina pool
     burn: 0,          // % chance on hit to set a fire DoT
     chill: 0,         // % chance on hit to slow the enemy
+    block: 0,         // % chance to fully negate an incoming hit (shields)
   };
 }
 
@@ -60,9 +61,9 @@ const STAT_LABELS = {
   meleeDmg: 'MELEE DMG', rangedDmg: 'RANGED DMG', elementalDmg: 'ELEM DMG',
   atkSpeedPct: 'ATK SPEED', crit: 'CRIT', armor: 'ARMOR',
   dodge: 'DODGE', range: 'RANGE', speedPct: 'SPEED', luck: 'LUCK',
-  stamina: 'STAMINA', maxHp: 'MAX HP', burn: 'BURN', chill: 'CHILL',
+  stamina: 'STAMINA', maxHp: 'MAX HP', burn: 'BURN', chill: 'CHILL', block: 'BLOCK',
 };
-const PCT_STATS = new Set(['dmgPct', 'atkSpeedPct', 'speedPct', 'crit', 'dodge', 'lifeSteal', 'luck', 'burn', 'chill']);
+const PCT_STATS = new Set(['dmgPct', 'atkSpeedPct', 'speedPct', 'crit', 'dodge', 'lifeSteal', 'luck', 'burn', 'chill', 'block']);
 
 // ─── Shop items (4 random offers per wave; some have downsides) ───────────────
 // dmgKind restricts the offer to classes using that damage type (no dead picks)
