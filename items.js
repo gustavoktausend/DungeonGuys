@@ -156,7 +156,9 @@ function equipDelta(item) {
   // weapon average-damage delta
   if (item.weapon) {
     const avg = w => w ? (w.damage[0] + w.damage[1]) / 2 : 0;
-    const d = Math.round(avg(item.weapon) - avg(cur?.weapon));
+    // the starting weapon is a flat tier (params at top level); catalog weapons nest them under .weapon
+    const curWeapon = cur && (cur.weapon || (Array.isArray(cur.damage) ? cur : null));
+    const d = Math.round(avg(item.weapon) - avg(curWeapon));
     if (d !== 0) {
       const sign = d > 0 ? '+' : '';
       parts.push(`<span class="${d > 0 ? 'cmp-up' : 'cmp-down'}">${sign}${d} DMG</span>`);
