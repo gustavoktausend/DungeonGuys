@@ -1227,5 +1227,70 @@ html, body {
 #wave-display            { font-size: clamp(16px, 3vw, 26px) !important; }
 #score-display, #gold-display { font-size: clamp(12px, 2vw, 18px) !important; }
 .btn-pixel               { font-size: clamp(11px, 1.8vw, 15px) !important; }
+
+/* ═══ Craftpix skin · Task 2: shared shell ═══ */
+.screen { background: radial-gradient(circle at 50% -10%, #2a1d12 0%, #0a0a0f 60%); }
+
+/* the signature: double wooden frame + cream interior */
+.screen-inner {
+  background: var(--cp-panel);
+  color: var(--cp-ink-dark);
+  border: 3px solid var(--cp-wood-dark);
+  box-shadow:
+    inset 0 0 0 3px var(--cp-wood-frame),
+    inset 0 0 0 6px var(--cp-wood-dark),
+    0 6px 0 0 rgba(0,0,0,0.5);
+  border-radius: 0;
+}
+
+/* titles become teal plates */
+.shop-title, .pause-title, .victory-title, .gameover-title, .title-sub {
+  display: inline-block;
+  background: var(--cp-header); color: var(--cp-ink-light);
+  border: 3px solid var(--cp-wood-dark);
+  box-shadow: inset 0 3px 0 var(--cp-header-hi), inset 0 -3px 0 var(--cp-header-dark), 0 3px 0 rgba(0,0,0,0.4);
+  padding: 8px 16px; margin-bottom: 14px;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.35);
+}
+.gameover-title { background: var(--cp-header); } /* keep readable; color via plate */
+
+/* chunky green button */
+.btn-pixel {
+  font-family: var(--display-font); color: var(--cp-ink-light);
+  background: var(--cp-btn);
+  border: 3px solid var(--cp-wood-dark);
+  box-shadow: inset 0 3px 0 var(--cp-btn-hi), inset 0 -4px 0 var(--cp-btn-dark), 0 3px 0 rgba(0,0,0,0.4);
+  border-radius: 0; padding: 12px 18px; transition: transform .05s;
+}
+.btn-pixel:hover { filter: brightness(1.06); }
+.btn-pixel:active { transform: translateY(3px); box-shadow: inset 0 3px 0 var(--cp-btn-hi), inset 0 -2px 0 var(--cp-btn-dark); }
+.btn-pixel.secondary { background: var(--cp-wood-frame);
+  box-shadow: inset 0 3px 0 var(--cp-wood-hi), inset 0 -4px 0 #7a5020, 0 3px 0 rgba(0,0,0,0.4); }
+
+/* ═══ Craftpix skin · Task 2: start screen ═══ */
+.class-card {
+  background: var(--cp-panel-edge); color: var(--cp-ink-dark);
+  border: 3px solid var(--cp-wood-dark);
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,0.22), inset -2px -2px 0 rgba(255,255,255,0.25);
+  border-radius: 0;
+}
+.class-card.selected { background: var(--cp-btn); color: var(--cp-ink-light);
+  box-shadow: inset 0 3px 0 var(--cp-btn-hi), inset 0 -3px 0 var(--cp-btn-dark); }
+.class-card.locked { opacity: .55; }
+.mode-btn, .aim-toggle {
+  font-family: var(--display-font); color: var(--cp-ink-light);
+  background: var(--cp-header); border: 3px solid var(--cp-wood-dark);
+  box-shadow: inset 0 3px 0 var(--cp-header-hi), inset 0 -3px 0 var(--cp-header-dark), 0 2px 0 rgba(0,0,0,0.4);
+  border-radius: 0;
+}
+.mode-btn.selected, .aim-toggle.on { background: var(--cp-btn);
+  box-shadow: inset 0 3px 0 var(--cp-btn-hi), inset 0 -3px 0 var(--cp-btn-dark); }
+#hero-name {
+  background: var(--cp-panel); color: var(--cp-ink-dark);
+  border: 3px solid var(--cp-wood-dark); border-radius: 0; font-family: var(--pixel-font);
+}
+.cslider input[type="range"] { border-color: var(--cp-wood-dark); }
+.cslider input[type="range"]::-webkit-slider-thumb { background: var(--cp-btn); border-color: var(--cp-wood-dark); }
+.cslider input[type="range"]::-moz-range-thumb { background: var(--cp-btn); border-color: var(--cp-wood-dark); }
 .class-name              { font-size: clamp(9px, 1.5vw, 12px) !important; }
 .class-desc, .footer-hint, .inst-row, .cval, .cdesc { font-size: clamp(9px, 1.4vw, 12px) !important; }
