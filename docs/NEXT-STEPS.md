@@ -46,16 +46,29 @@ Foi proposta no início e ficou de fora (o usuário priorizou outros pacotes). S
 - **Começar por:** `brainstorming` (definir conquistas, gatilhos, recompensas; formato do daily) → spec → plano → execução.
 - Arquivos prováveis: `save.js` (persistência de conquistas/daily), `ui.js` (tela), `entities.js`/`combat.js` (gatilhos), `engine.js` (seed do daily).
 
-### 2. Mecânica do special — estudo e possível rework (feature; pedido pelo usuário)
-Hoje o special é **fixo por classe** (`CLASS_DEFS[cls].special` + `specialCd`), acionado por **E / botão direito / botão touch**; o cooldown vive em `player.specialTimer` (decrementado em `updatePlayer`, combat.js), com barra no HUD (`sp-bar`) e anel de recarga no botão mobile. `castSpecial()` (combat.js) é um `switch` sobre o special: `fireball`, `volley`, `whirlwind`, `dash`, `nova`, `emp`, `hex`.
+### 2. Especializações / sub-classes (ramos por classe) — rework do special (feature; pedido pelo usuário)
 
-Direções a explorar (decisão de design → **começar por `brainstorming`**):
-- **Special escolhível** — desacoplar o special da classe: escolher na tela inicial, ou trocar/desbloquear via loja/forge/level-up. Decidir se cada classe tem um pool próprio ou se há specials genéricos compartilhados.
-- **Redução de cooldown (CDR)** — novo stat `cdr` em `baseStats()`, aplicado ao iniciar o cooldown em `castSpecial` (ex.: `player.specialTimer = player.def.specialCd * (1 - cdr/100)`, com cap). Encaixa direto no sistema de stats/equipamentos atual: anéis/amuletos de CDR, blessing de CDR no level-up, perk de forge.
-- **Progressão do special** — níveis/tiers que aumentam dano/raio/duração (como as armas tinham tiers), via level-up ou loja; ou desbloquear um 2º special.
-- **Cargas (charges)** — acumular 2+ usos do special antes de precisar recarregar.
+**Visão:** cada classe ganha um **ramo de especialização** (sub-classe temática) que define/transforma o special — e possivelmente o sabor do ataque e passivos. Exemplo: **Mago → Criomante** (gelo/congelamento) ou **Sábio dos Trovões** (raio/corrente). Cada uma das 7 classes teria 2 (ou mais) ramos com identidade própria. É a evolução da ideia de "special escolhível": em vez de um pool genérico, são caminhos de build por classe.
 
-Arquivos prováveis: `config.js` (specials das classes), `combat.js` (`castSpecial`, cooldown), `ui.js` (`baseStats` para `cdr`, HUD), `items.js`/`entities.js` (itens/blessings de CDR), `index.html` (seleção de special, se houver). Lembrar de refletir o CDR também no anel do botão touch e na `sp-bar`.
+**Estado atual:** o special é **fixo por classe** (`CLASS_DEFS[cls].special` + `specialCd`), acionado por **E / botão direito / botão touch**; cooldown em `player.specialTimer` (decrementado em `updatePlayer`, combat.js), barra `sp-bar` no HUD + anel no botão mobile. `castSpecial()` (combat.js) é um `switch`: `fireball`, `volley`, `whirlwind`, `dash`, `nova`, `emp`, `hex`. Já há efeitos elementais reusáveis: `burn` (fogo), `chill` (gelo/slow), `poison`.
+
+**Perguntas de design para o brainstorming (decisão de design → começar por `brainstorming`):**
+- **Quando se escolhe o ramo?** Tela inicial · um marco na run (ex.: ao chegar na wave 4 / nível X) · desbloqueio meta no forge. (Um marco na run dá uma decisão significativa por partida; alinhado com o roguelite.)
+- **O que o ramo muda?** Só o special · special + sabor do ataque (efeito elemental no tiro/golpe) · special + passivos/stats. Sugestão: trocar o special **e** aplicar um efeito temático ao ataque básico (ex.: Criomante aplica `chill`; Trovões aplica um efeito novo "shock"/corrente).
+- **Quantos ramos por classe?** 2 (como o exemplo) ou 3.
+- **Por-run ou permanente?** Escolha a cada run (roguelite) vs. desbloqueio/fixo (meta). Recomendação inicial: **por-run**, coerente com o resto (equipamentos são por-run).
+- **Como integra com o resto:** reusar `burn`/`chill`/`poison` (+ talvez um efeito "shock" novo); manter o **arquétipo** de equipamentos (a sub-classe é sabor, não muda melee/ranged/elemental); decidir se há **progressão** do ramo (níveis que melhoram o special), **CDR** (stat `cdr` reduzindo `specialCd`, encaixa em anéis/amuletos/blessings/forge) e/ou **cargas** (acumular usos).
+
+**Esboço de ramos por classe — RASCUNHO a validar no brainstorming, não definitivo:**
+- Mago: Criomante (gelo) · Sábio dos Trovões (raio)
+- Bruxa: Pestilenta (poison) · Hexer (maldições/slow)
+- Arqueiro: Caçador (multishot) · Franco-atirador (crit/perfuração)
+- CopRobô: Engenheiro (torretas/EMP) · Sobrecarga (rajada)
+- Guerreiro: Berserker (fúria/lifesteal) · Guardião (block/provocar)
+- Ninja: Assassino (crit/dash) · Espectro (clones/veneno)
+- Sacerdotisa: Cruzada (dano sagrado) · Oráculo (cura/suporte)
+
+**Arquivos prováveis:** `config.js` (ramos por classe + specials), `combat.js` (`castSpecial`, efeito de ataque por ramo, cooldown/CDR), `ui.js` (`baseStats` p/ `cdr`, HUD, UI de escolha do ramo), `index.html` (UI de escolha), `entities.js`/`items.js` (efeito "shock" novo, itens/blessings de CDR). Refletir o CDR também na `sp-bar` e no anel do botão touch.
 
 ### 3. Balance pass do sistema de equipamentos (médio)
 Agora que a arma vira loot e fica fixa até a loja, vale revisar a curva:
