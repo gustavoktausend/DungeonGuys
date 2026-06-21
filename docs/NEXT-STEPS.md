@@ -46,14 +46,25 @@ Foi proposta no início e ficou de fora (o usuário priorizou outros pacotes). S
 - **Começar por:** `brainstorming` (definir conquistas, gatilhos, recompensas; formato do daily) → spec → plano → execução.
 - Arquivos prováveis: `save.js` (persistência de conquistas/daily), `ui.js` (tela), `entities.js`/`combat.js` (gatilhos), `engine.js` (seed do daily).
 
-### 2. Balance pass do sistema de equipamentos (médio)
+### 2. Mecânica do special — estudo e possível rework (feature; pedido pelo usuário)
+Hoje o special é **fixo por classe** (`CLASS_DEFS[cls].special` + `specialCd`), acionado por **E / botão direito / botão touch**; o cooldown vive em `player.specialTimer` (decrementado em `updatePlayer`, combat.js), com barra no HUD (`sp-bar`) e anel de recarga no botão mobile. `castSpecial()` (combat.js) é um `switch` sobre o special: `fireball`, `volley`, `whirlwind`, `dash`, `nova`, `emp`, `hex`.
+
+Direções a explorar (decisão de design → **começar por `brainstorming`**):
+- **Special escolhível** — desacoplar o special da classe: escolher na tela inicial, ou trocar/desbloquear via loja/forge/level-up. Decidir se cada classe tem um pool próprio ou se há specials genéricos compartilhados.
+- **Redução de cooldown (CDR)** — novo stat `cdr` em `baseStats()`, aplicado ao iniciar o cooldown em `castSpecial` (ex.: `player.specialTimer = player.def.specialCd * (1 - cdr/100)`, com cap). Encaixa direto no sistema de stats/equipamentos atual: anéis/amuletos de CDR, blessing de CDR no level-up, perk de forge.
+- **Progressão do special** — níveis/tiers que aumentam dano/raio/duração (como as armas tinham tiers), via level-up ou loja; ou desbloquear um 2º special.
+- **Cargas (charges)** — acumular 2+ usos do special antes de precisar recarregar.
+
+Arquivos prováveis: `config.js` (specials das classes), `combat.js` (`castSpecial`, cooldown), `ui.js` (`baseStats` para `cdr`, HUD), `items.js`/`entities.js` (itens/blessings de CDR), `index.html` (seleção de special, se houver). Lembrar de refletir o CDR também no anel do botão touch e na `sp-bar`.
+
+### 3. Balance pass do sistema de equipamentos (médio)
 Agora que a arma vira loot e fica fixa até a loja, vale revisar a curva:
 - **Curva da campanha:** a arma inicial (tier 0) é mantida até a primeira compra na loja — verificar se as waves 1-3 não ficaram fáceis/difíceis demais.
 - **Catálogo** (`equipment-catalog.js`): revisar preços e poder relativo. Nota concreta: `STORM ROD` (`fireRate 130`) atira mais rápido que armas que deveriam ser mais lentas — alinhar cadências por arquétipo.
 - **Block vs dodge vs armor:** confirmar que o block do escudo (cap 75%) não trivializa o dano recebido em conjunto com dodge/armor.
 - Sem spec novo necessário; é ajuste de números + playtest no navegador.
 
-### 3. Polish menor (pequeno, oportunístico)
+### 4. Polish menor (pequeno, oportunístico)
 Itens registrados nos reviews, não-bloqueantes:
 - **Som dedicado de block:** hoje `damagePlayer` reusa o SFX `'dodge'` para o block. Adicionar um som próprio em `audio.js` (`Sfx`) e usá-lo.
 - **Teste de integridade do catálogo:** `tests/equipment-catalog.test.js` não valida o formato de `weapon.poison` (`{ dps, dur }`). Adicionar uma checagem opcional.
@@ -69,4 +80,4 @@ Itens registrados nos reviews, não-bloqueantes:
 
 ## Como começar a próxima sessão (prompt sugerido)
 
-> "Leia `docs/NEXT-STEPS.md`. Quero trabalhar no item **<1 / 2 / 3>**. Se for feature nova (item 1), comece pelo brainstorming; senão, vá direto ao plano/implementação. Teste com node + Playwright como descrito, e ao final faça merge na main + push."
+> "Leia `docs/NEXT-STEPS.md`. Quero trabalhar no item **<1 / 2 / 3 / 4>**. Se for feature nova (itens 1 ou 2), comece pelo brainstorming; senão, vá direto ao plano/implementação. Teste com node + Playwright como descrito, e ao final faça merge na main + push."
