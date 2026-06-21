@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DungeonGuys — UI Style Lab</title>
+<!-- ISOLATED PROTOTYPE: does not touch the game (index.html/style.css). Explores the
+     Craftpix "pixel RPG GUI" concept in pure CSS for the Phase-3 UI overhaul. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --wood-dark:#241a14; --wood-frame:#b07a3a; --wood-hi:#e0b76a;
+    --panel:#ecdcb0; --panel-edge:#cdb585; --slot-empty:#9c8254;
+    --header:#3f9d8c; --header-dark:#2a6b60; --header-hi:#5bb8a6;
+    --btn:#84c96a; --btn-dark:#4a7a3a; --btn-hi:#a6e08a;
+    --ink-light:#f6ecd2; --ink-dark:#5a4632;
+    --acc-blue:#4a90d9; --acc-red:#d9534a; --acc-green:#6fbf4f; --acc-gold:#e8c34a; --acc-purple:#9b59b6;
+    --pix:'Pixelify Sans', system-ui, sans-serif;
+    --disp:'Press Start 2P', system-ui, monospace;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; min-height:100vh; font-family:var(--pix);
+    color:var(--ink-dark); image-rendering:pixelated;
+    background:#150e08;
+    background-image:
+      radial-gradient(circle at 50% -10%, #2a1d12 0%, #150e08 60%),
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 2px, transparent 2px 4px);
+    padding:28px 16px 48px;
+  }
+
+  /* ── title ── */
+  .lab-title{ text-align:center; margin:6px 0 30px; }
+  .lab-title h1{
+    font-family:var(--disp); font-size:clamp(18px,4.2vw,30px); margin:0;
+    color:var(--wood-hi); letter-spacing:2px;
+    text-shadow:0 3px 0 #000, 0 0 14px rgba(224,183,106,0.35);
+  }
+  .lab-title p{
+    font-family:var(--disp); font-size:9px; letter-spacing:2px;
+    color:var(--header-hi); margin:12px 0 0;
+  }
+
+  .grid{ max-width:880px; margin:0 auto; display:grid; gap:34px 26px;
+         grid-template-columns:1fr 1fr; align-items:start; }
+  @media (max-width:680px){ .grid{ grid-template-columns:1fr; } }
+
+  /* ── PANEL: the double wooden frame + cream interior (signature) ── */
+  .panel{
+    position:relative; background:var(--panel);
+    border:3px solid var(--wood-dark);
+    box-shadow:
+      inset 0 0 0 3px var(--wood-frame),
+      inset 0 0 0 6px var(--wood-dark),
+      0 5px 0 0 rgba(0,0,0,0.5);
+    padding:30px 16px 18px;
+  }
+  /* teal title plate, seated over the top edge */
+  .panel > .title{
+    position:absolute; top:-15px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:10px; white-space:nowrap;
+    background:var(--header); color:var(--ink-light);
+    border:3px solid var(--wood-dark);
+    box-shadow: inset 0 3px 0 var(--header-hi), inset 0 -3px 0 var(--header-dark), 0 3px 0 rgba(0,0,0,0.4);
+    font-family:var(--disp); font-size:11px; letter-spacing:1px;
+    padding:7px 14px;
+  }
+  .panel > .title .x{
+    width:14px; height:14px; display:grid; place-items:center;
+    background:var(--acc-red); color:#fff; font-family:var(--pix); font-weight:700;
+    border:2px solid var(--wood-dark); font-size:12px; line-height:1;
+  }
+
+  /* ── slots grid ── */
+  .slots{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .slot{
+    aspect-ratio:1; display:grid; place-items:center; font-size:clamp(18px,4vw,24px);
+    background:var(--panel-edge); border:3px solid var(--wood-dark);
+    box-shadow: inset 2px 2px 0 rgba(0,0,0,0.28), inset -2px -2px 0 rgba(255,255,255,0.3);
+  }
+  .slot.empty{ background:var(--slot-empty); opacity:.6; }
+
+  /* ── bars (HP / XP / SPECIAL) ── */
+  .bars{ display:flex; flex-direction:column; gap:9px; margin-top:4px; }
+  .bar-row{ display:grid; grid-template-columns:54px 1fr; align-items:center; gap:8px; }
+  .bar-row b{ font-family:var(--disp); font-size:8px; color:var(--ink-dark); }
+  .bar{ height:16px; background:#2a1d12; border:3px solid var(--wood-dark);
+        box-shadow: inset 0 0 0 1px #000; overflow:hidden; }
+  .bar i{ display:block; height:100%; }
+  .bar.hp i{ width:72%; background:linear-gradient(#e0584a,#b83b30); }
+  .bar.xp i{ width:45%; background:linear-gradient(#5bb8e0,#3a82c4); }
+  .bar.sp i{ width:100%; background:linear-gradient(#e0c14a,#caa12f); }
+
+  /* ── shop offers ── */
+  .offers{ display:flex; flex-direction:column; gap:10px; }
+  .offer{
+    display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:10px;
+    background:var(--panel-edge); border:3px solid var(--wood-dark);
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.22), inset 0 2px 0 rgba(255,255,255,0.25);
+    padding:9px 11px;
+  }
+  .offer .ico{ font-size:24px; }
+  .offer .info{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .offer .nm{ font-weight:700; font-size:15px; color:var(--ink-dark); letter-spacing:.5px; }
+  .offer .fx{ font-size:12px; display:flex; gap:8px; flex-wrap:wrap; }
+  .up{ color:#2f7d3a; } .down{ color:#b83b30; }
+  .price{ font-family:var(--disp); font-size:10px; color:#7a5a1f; }
+
+  /* ── chunky button ── */
+  .btn{
+    font-family:var(--disp); font-size:10px; letter-spacing:1px; color:var(--ink-light);
+    background:var(--btn); border:3px solid var(--wood-dark);
+    box-shadow: inset 0 3px 0 var(--btn-hi), inset 0 -4px 0 var(--btn-dark), 0 3px 0 rgba(0,0,0,0.4);
+    padding:11px 14px; cursor:pointer; width:100%; margin-top:14px;
+  }
+  .btn:active{ transform:translate(0,3px); box-shadow: inset 0 3px 0 var(--btn-hi), inset 0 -2px 0 var(--btn-dark); }
+  .btn.amber{ background:var(--wood-frame); box-shadow: inset 0 3px 0 var(--wood-hi), inset 0 -4px 0 #7a5020, 0 3px 0 rgba(0,0,0,0.4); }
+
+  .note{ max-width:880px; margin:30px auto 0; text-align:center; font-size:13px;
+         color:#9c8254; letter-spacing:.5px; }
+  .stat-line{ display:flex; justify-content:space-between; font-size:14px; padding:2px 2px;
+              border-bottom:2px dotted rgba(90,70,50,0.25); }
+  .stat-line span:last-child{ color:#2f7d3a; font-weight:600; }
+</style>
+</head>
+<body>
+  <div class="lab-title">
+    <h1>DUNGEONGUYS</h1>
+    <p>UI STYLE LAB · PIXEL RPG</p>
+  </div>
+
+  <div class="grid">
+    <!-- left column -->
+    <div>
+      <section class="panel">
+        <div class="title"><span>EQUIPMENT</span><span class="x">✕</span></div>
+        <div class="slots">
+          <div class="slot" title="weapon">⚔</div>
+          <div class="slot" title="offhand">🔰</div>
+          <div class="slot" title="helm">⛑</div>
+          <div class="slot empty" title="armor">🦺</div>
+          <div class="slot empty" title="boots">👢</div>
+          <div class="slot" title="ring">💍</div>
+          <div class="slot empty" title="ring">💍</div>
+          <div class="slot" title="amulet">📿</div>
+        </div>
+        <div class="bars">
+          <div class="bar-row"><b>HP</b><div class="bar hp"><i></i></div></div>
+          <div class="bar-row"><b>XP</b><div class="bar xp"><i></i></div></div>
+          <div class="bar-row"><b>SP</b><div class="bar sp"><i></i></div></div>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top:34px;">
+        <div class="title"><span>STATS</span></div>
+        <div class="stat-line"><span>DANO</span><span>+18%</span></div>
+        <div class="stat-line"><span>ARMOR</span><span>+7</span></div>
+        <div class="stat-line"><span>BLOCK</span><span>+12%</span></div>
+        <div class="stat-line"><span>CRIT</span><span>+8%</span></div>
+      </section>
+    </div>
+
+    <!-- right column -->
+    <div>
+      <section class="panel">
+        <div class="title"><span>SHOP</span><span class="x">✕</span></div>
+        <div class="offers">
+          <div class="offer">
+            <span class="ico">🔰</span>
+            <span class="info"><span class="nm">KITE SHIELD</span>
+              <span class="fx"><span class="up">+4 ARMOR</span><span class="up">+12% BLOCK</span></span></span>
+            <span class="price">44¤</span>
+          </div>
+          <div class="offer">
+            <span class="ico">🔮</span>
+            <span class="info"><span class="nm">ARCANE SCEPTER</span>
+              <span class="fx"><span class="up">+10 DMG</span><span class="down">−1H</span></span></span>
+            <span class="price">78¤</span>
+          </div>
+          <div class="offer">
+            <span class="ico">📿</span>
+            <span class="info"><span class="nm">EMBER PENDANT</span>
+              <span class="fx"><span class="up">+14% BURN</span></span></span>
+            <span class="price">36¤</span>
+          </div>
+        </div>
+        <button class="btn">▶ BUY</button>
+        <button class="btn amber">↺ REROLL · 5¤</button>
+      </section>
+
+      <section class="panel" style="margin-top:34px;">
+        <div class="title"><span>WAVE CLEAR</span></div>
+        <div style="text-align:center; font-size:30px; letter-spacing:6px; color:var(--acc-gold); margin:4px 0 2px;">★ ★ ★</div>
+        <div style="text-align:center; font-family:var(--disp); font-size:9px; color:var(--ink-dark);">SCORE&nbsp;2345</div>
+        <button class="btn">▶ NEXT WAVE</button>
+      </section>
+    </div>
+  </div>
+
+  <p class="note">Protótipo isolado — não altera o jogo. Conceito de UI (Craftpix) em CSS nativo.</p>
+</body>
+</html>
