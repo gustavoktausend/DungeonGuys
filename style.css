@@ -18,8 +18,14 @@
   --hp-low:        #e74c3c;
   --gold-coin:     #f1c40f;
   --ui-border:     var(--bronze);
-  --pixel-font:    'MedievalSharp', serif;
-  --display-font:  'Pirata One', serif;
+  --pixel-font:    'Pixelify Sans', system-ui, sans-serif;
+  --display-font:  'Press Start 2P', system-ui, monospace;
+  /* ── Craftpix pixel-RPG skin tokens (prefixed to avoid clashing) ── */
+  --cp-wood-dark:#241a14; --cp-wood-frame:#b07a3a; --cp-wood-hi:#e0b76a;
+  --cp-panel:#ecdcb0; --cp-panel-edge:#cdb585; --cp-slot-empty:#9c8254;
+  --cp-header:#3f9d8c; --cp-header-dark:#2a6b60; --cp-header-hi:#5bb8a6;
+  --cp-btn:#84c96a; --cp-btn-dark:#4a7a3a; --cp-btn-hi:#a6e08a;
+  --cp-ink-light:#f6ecd2; --cp-ink-dark:#5a4632;
 }
 
 html, body {
@@ -1210,3 +1216,16 @@ html, body {
 .instructions.hidden-inst { display: none; }
 
 .robo-icon { color: #66ccff; text-shadow: 0 0 10px rgba(102,204,255,0.6); }
+
+/* ═══ Craftpix skin · Task 1: rein in display sizes (Press Start 2P is wide) ═══ */
+.title-glow, .title-main { font-size: clamp(20px, 5vw, 38px) !important; line-height: 1.15; }
+.title-sub               { font-size: clamp(8px, 1.5vw, 11px) !important; letter-spacing: 2px; }
+.shop-title              { font-size: clamp(13px, 2.6vw, 20px) !important; letter-spacing: 1px; }
+.gameover-title, .victory-title { font-size: clamp(16px, 3.4vw, 28px) !important; line-height: 1.2; }
+.pause-title, .levelup-sub, .shop-gold, .footer-hint, .color-label, .class-name,
+.hud-label, .stat-row, .stat-line, .shop-name, .f-name { letter-spacing: 0.5px; }
+#wave-display            { font-size: clamp(16px, 3vw, 26px) !important; }
+#score-display, #gold-display { font-size: clamp(12px, 2vw, 18px) !important; }
+.btn-pixel               { font-size: clamp(11px, 1.8vw, 15px) !important; }
+.class-name              { font-size: clamp(9px, 1.5vw, 12px) !important; }
+.class-desc, .footer-hint, .inst-row, .cval, .cdesc { font-size: clamp(9px, 1.4vw, 12px) !important; }
