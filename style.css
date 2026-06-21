@@ -792,6 +792,7 @@ html, body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  min-height: 72px;
 }
 
 .cmp-up   { color: var(--hp-green); font-size: clamp(10px, 1.4vw, 13px); }

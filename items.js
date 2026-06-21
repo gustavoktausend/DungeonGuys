@@ -68,10 +68,13 @@ function renderShop() {
   // equipped-set panel (8 slots)
   const slotLabels = { weapon: 'WEAPON', offhand: 'OFF-HAND', helm: 'HELM', armor: 'ARMOR',
                        boots: 'BOOTS', ring1: 'RING', ring2: 'RING', amulet: 'AMULET' };
+  const slotIcons  = { weapon: '⚔', offhand: '🛡', helm: '⛑', armor: '🦺',
+                       boots: '👢', ring1: '💍', ring2: '💍', amulet: '📿' };
   document.getElementById('shop-slots').innerHTML = EQUIP_SLOTS.map(s => {
-    const it = player.equipment[s];
+    const it  = player.equipment[s];
+    const ico = it ? (it.icon || slotIcons[s]) : slotIcons[s];
     return `<div class="slot-chip ${it ? 'filled' : 'empty'}" title="${slotLabels[s]}">
-        <span class="slot-ico">${it ? (it.icon || '▫') : '·'}</span>
+        <span class="slot-ico">${ico}</span>
         <span class="slot-lbl">${it ? it.name : slotLabels[s]}</span>
       </div>`;
   }).join('');
