@@ -70,14 +70,28 @@ Foi proposta no início e ficou de fora (o usuário priorizou outros pacotes). S
 
 **Arquivos prováveis:** `config.js` (ramos por classe + specials), `combat.js` (`castSpecial`, efeito de ataque por ramo, cooldown/CDR), `ui.js` (`baseStats` p/ `cdr`, HUD, UI de escolha do ramo), `index.html` (UI de escolha), `entities.js`/`items.js` (efeito "shock" novo, itens/blessings de CDR). Refletir o CDR também na `sp-bar` e no anel do botão touch.
 
-### 3. Balance pass do sistema de equipamentos (médio)
+### 3. Repaginação visual da UI — "up forte" no visual (feature; pedido pelo usuário)
+
+**Visão:** elevar bastante o acabamento da interface (telas, HUD, loja, painéis), mantendo o tema pixel/dungeon. Buscar **assets** prontos (UI kit de pixel art: molduras, painéis, ícones, fonte) **ou** replicar o visual com **HTML/CSS nativos** (sem imagens) — ou um híbrido.
+
+**Estado atual:** UI já estilizada em `style.css` (~30 KB), tema dourado/bronze (variáveis `--gold`, `--bronze`, `--parchment`…), fontes `MedievalSharp`/`Pirata One` (Google Fonts), molduras via bordas/outlines/gradientes CSS. Telas em `index.html`: start, pause, forge, stats, level-up, shop, victory, game over; + HUD, controles touch, boss bar, wave announce. Tudo responsivo/mobile (PWA).
+
+**Decisões de design para o brainstorming (começar por `brainstorming` + usar o skill `frontend-design` para direção estética):**
+- **Escopo/prioridade:** quais telas primeiro? Sugestão: **start screen + HUD + shop** (as mais vistas). Fazer **antes/depois** com screenshots (Playwright presta muito para isso).
+- **Abordagem:** **CSS nativo** (molduras 9-slice via `border-image`, gradientes, `box-shadow`, animações — leve, escalável, sem deps, alinhado ao "vanilla, sem build") **vs. assets de imagem** (painéis/molduras/ícones de pixel art — mais ricos, porém mais peso e cuidado de escala) **vs. híbrido**. Recomendação inicial: priorizar CSS nativo + poucos assets pontuais.
+- **Se usar assets:** garantir **licença CC0/compatível** (o jogo já usa o tileset 0x72 CC0); adicionar ao `PRECACHE` do `sw.js`; usar `image-rendering: pixelated` e cuidar do peso.
+- **Consistência:** manter a paleta/variáveis CSS e o look pixel-art, preservar legibilidade, **não** quebrar a responsividade mobile nem os controles touch.
+
+**Arquivos prováveis:** `style.css` (núcleo), `index.html` (estrutura das telas), `manifest.json`/`icons/` (se mexer em ícones do PWA), `sw.js` (PRECACHE de assets novos), `assets/` (arte nova).
+
+### 4. Balance pass do sistema de equipamentos (médio)
 Agora que a arma vira loot e fica fixa até a loja, vale revisar a curva:
 - **Curva da campanha:** a arma inicial (tier 0) é mantida até a primeira compra na loja — verificar se as waves 1-3 não ficaram fáceis/difíceis demais.
 - **Catálogo** (`equipment-catalog.js`): revisar preços e poder relativo. Nota concreta: `STORM ROD` (`fireRate 130`) atira mais rápido que armas que deveriam ser mais lentas — alinhar cadências por arquétipo.
 - **Block vs dodge vs armor:** confirmar que o block do escudo (cap 75%) não trivializa o dano recebido em conjunto com dodge/armor.
 - Sem spec novo necessário; é ajuste de números + playtest no navegador.
 
-### 4. Polish menor (pequeno, oportunístico)
+### 5. Polish menor (pequeno, oportunístico)
 Itens registrados nos reviews, não-bloqueantes:
 - **Som dedicado de block:** hoje `damagePlayer` reusa o SFX `'dodge'` para o block. Adicionar um som próprio em `audio.js` (`Sfx`) e usá-lo.
 - **Teste de integridade do catálogo:** `tests/equipment-catalog.test.js` não valida o formato de `weapon.poison` (`{ dps, dur }`). Adicionar uma checagem opcional.
@@ -93,4 +107,4 @@ Itens registrados nos reviews, não-bloqueantes:
 
 ## Como começar a próxima sessão (prompt sugerido)
 
-> "Leia `docs/NEXT-STEPS.md`. Quero trabalhar no item **<1 / 2 / 3 / 4>**. Se for feature nova (itens 1 ou 2), comece pelo brainstorming; senão, vá direto ao plano/implementação. Teste com node + Playwright como descrito, e ao final faça merge na main + push."
+> "Leia `docs/NEXT-STEPS.md`. Quero trabalhar no item **<1 / 2 / 3 / 4 / 5>**. Se for feature nova (itens 1, 2 ou 3), comece pelo brainstorming; senão, vá direto ao plano/implementação. Teste com node + Playwright como descrito, e ao final faça merge na main + push."
