@@ -70,19 +70,17 @@ Foi proposta no início e ficou de fora (o usuário priorizou outros pacotes). S
 
 **Arquivos prováveis:** `config.js` (ramos por classe + specials), `combat.js` (`castSpecial`, efeito de ataque por ramo, cooldown/CDR), `ui.js` (`baseStats` p/ `cdr`, HUD, UI de escolha do ramo), `index.html` (UI de escolha), `entities.js`/`items.js` (efeito "shock" novo, itens/blessings de CDR). Refletir o CDR também na `sp-bar` e no anel do botão touch.
 
-### 3. Repaginação visual da UI — "up forte" no visual (feature; pedido pelo usuário)
+### 3. Repaginação visual da UI — LEVA 1 FEITA ✅; leva 2 pendente (feature)
 
-**Visão:** elevar bastante o acabamento da interface (telas, HUD, loja, painéis), mantendo o tema pixel/dungeon. Buscar **assets** prontos (UI kit de pixel art: molduras, painéis, ícones, fonte) **ou** replicar o visual com **HTML/CSS nativos** (sem imagens) — ou um híbrido.
+**Concluído (leva 1, já na `main`):** UI repaginada no estilo "pixel RPG" (conceito Craftpix) com **tema escuro de dungeon**, a partir de uma paleta DawnBringer fornecida pelo usuário — GUI em índigo/violeta (`#222034`/`#45283C`/`#3F3F74`) + acentos **vermelho `#AC3232`** (alerta: wave/HP/deltas) e **oliva `#49662F`** (CTA/seleção). Fontes pixel (`Press Start 2P` títulos + `Pixelify Sans` corpo). Telas repaginadas: **start screen, HUD, shop**. Plano: `docs/superpowers/plans/2026-06-21-ui-overhaul-fase1.md`.
 
-**Estado atual:** UI já estilizada em `style.css` (~30 KB), tema dourado/bronze (variáveis `--gold`, `--bronze`, `--parchment`…), fontes `MedievalSharp`/`Pirata One` (Google Fonts), molduras via bordas/outlines/gradientes CSS. Telas em `index.html`: start, pause, forge, stats, level-up, shop, victory, game over; + HUD, controles touch, boss bar, wave announce. Tudo responsivo/mobile (PWA).
+**Como o skin funciona (importante):** todo o visual usa tokens **`--cp-*`** no `:root` do `style.css` + um bloco "Craftpix skin" no FIM do `style.css` que reskina os seletores existentes (`.screen-inner`, `.btn-pixel`, títulos, HUD, shop). **Trocar a paleta = trocar os valores dos tokens.** Referência de estilo: `docs/superpowers/refs/ui-craftpix-style.md`. Protótipo visual: `ui-lab.html` (na raiz). ⚠️ ao testar no navegador, o cache de `localhost` segura `style.css`; re-injete `style.css?v=Date.now()` ou confie no que está no disco.
 
-**Decisões de design para o brainstorming (começar por `brainstorming` + usar o skill `frontend-design` para direção estética):**
-- **Escopo/prioridade:** quais telas primeiro? Sugestão: **start screen + HUD + shop** (as mais vistas). Fazer **antes/depois** com screenshots (Playwright presta muito para isso).
-- **Abordagem:** **CSS nativo** (molduras 9-slice via `border-image`, gradientes, `box-shadow`, animações — leve, escalável, sem deps, alinhado ao "vanilla, sem build") **vs. assets de imagem** (painéis/molduras/ícones de pixel art — mais ricos, porém mais peso e cuidado de escala) **vs. híbrido**. Recomendação inicial: priorizar CSS nativo + poucos assets pontuais.
-- **Se usar assets:** garantir **licença CC0/compatível** (o jogo já usa o tileset 0x72 CC0); adicionar ao `PRECACHE` do `sw.js`; usar `image-rendering: pixelated` e cuidar do peso.
-- **Consistência:** manter a paleta/variáveis CSS e o look pixel-art, preservar legibilidade, **não** quebrar a responsividade mobile nem os controles touch.
+Tokens atuais (tema escuro): `--cp-wood-dark #14121e` · `--cp-wood-frame #3f3f74` · `--cp-wood-hi #6a6ab0` · `--cp-panel #222034` · `--cp-panel-edge #2c2a46` · `--cp-slot-empty #191726` · `--cp-header #45283c` · `--cp-btn #49662f` · `--cp-ink-light #ece9f7` · `--cp-ink-dark #c7c3e0` (claro!) · `--cp-accent #ac3232`. Título do jogo: `#9a9af0`.
 
-**Arquivos prováveis:** `style.css` (núcleo), `index.html` (estrutura das telas), `manifest.json`/`icons/` (se mexer em ícones do PWA), `sw.js` (PRECACHE de assets novos), `assets/` (arte nova).
+**Pendente (leva 2):** afinar as telas secundárias — **pause, forge, stats, level-up, victory, game over**. Já herdam o "esqueleto" do skin (moldura/painel/botões/plaqueta via seletores compartilhados — o LEVEL UP, por ex., já ficou bom), mas podem pedir ajustes específicos (paddings, contraste de elementos próprios de cada tela). Verificar cada uma por screenshot (Playwright) e ajustar. Extras opcionais: setas de acento nos slots; sprites de elmo/armadura no boneco (exige pixel art nova).
+
+**Ajuste de cor é trivial:** mande `N → #HEX` (posição) que é só editar o token correspondente no `:root`.
 
 ### 4. Balance pass do sistema de equipamentos (médio)
 Agora que a arma vira loot e fica fixa até a loja, vale revisar a curva:

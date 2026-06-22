@@ -3,6 +3,8 @@
 > Guardado para o **item 3 do roadmap (overhaul de UI)**. Referência visual:
 > https://img.craftpix.net/2025/10/Free-Basic-Pixel-Art-UI-for-RPG-720x480.webp
 > Protótipo isolado que aplica este estilo: **`ui-lab.html`** (raiz; não altera o jogo).
+>
+> **✅ Aplicado (leva 1, junho/2026):** o jogo já usa este padrão, porém com **tema escuro de dungeon** — não a paleta clara da tabela abaixo. Paleta/tokens atuais ficam em `style.css` (`:root`, prefixo `--cp-*`) e estão resumidos em `docs/NEXT-STEPS.md` (item 3). A tabela de cores abaixo é o **conceito Craftpix original** (claro), mantida como referência histórica do padrão estrutural.
 
 ## ⚠️ Licença
 Este doc captura o **estilo/conceito** (cores, padrões), que será **replicado em CSS nativo** — não há problema de licença em replicar um estilo. **Não** commitar nem usar os PNGs/assets da Craftpix sem seguir a licença Craftpix Free. Se quiser arte real, preferir packs **CC0**.
