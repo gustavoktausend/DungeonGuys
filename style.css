@@ -24,7 +24,7 @@
   /* skin retoned to the game's gold/bronze/parchment palette (no teal/green) */
   --cp-wood-dark:#1d1410; --cp-wood-frame:#8a6a2f; --cp-wood-hi:#e8c96a;
   --cp-panel:#e6d6ae; --cp-panel-edge:#c4b083; --cp-slot-empty:#9c8254;
-  --cp-header:#4a3a1e; --cp-header-dark:#2c2010; --cp-header-hi:#6b552b;
+  --cp-header:#6e5526; --cp-header-dark:#43330f; --cp-header-hi:#9c7d3c;
   --cp-btn:#7a5a26; --cp-btn-dark:#3f2c12; --cp-btn-hi:#c9a227;
   --cp-ink-light:#f6ecd2; --cp-ink-dark:#5a4632;
 }
