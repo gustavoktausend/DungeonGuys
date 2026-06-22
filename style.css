@@ -1308,3 +1308,46 @@ html, body {
 /* status accents readable on the dark cards/panels */
 .fx-pos, .cmp-up { color: #8fbf6a !important; }
 .fx-neg, .cmp-down { color: #d9605a !important; }
+
+/* ═══ Craftpix skin · Task 3: HUD (dark dungeon) ═══ */
+#hud-left, #hud-center, #hud-right {
+  background: var(--cp-panel); color: var(--cp-ink-light);
+  border: 3px solid var(--cp-wood-dark);
+  box-shadow: inset 0 0 0 2px var(--cp-wood-frame), 0 3px 0 rgba(0,0,0,0.45);
+  border-radius: 0; padding: 8px 10px;
+}
+.hud-label { color: var(--cp-ink-dark); font-family: var(--display-font); }
+#hud-name, #score-display, #wave-timer { color: var(--cp-ink-light); text-shadow: none; }
+#wave-display { color: var(--cp-accent-hi); text-shadow: 0 2px 0 rgba(0,0,0,0.5); }
+#gold-display { color: #d8b24a; }
+#combo-display { color: #e8c34a; }
+#hp-bar-wrap, #xp-bar-wrap, #st-bar-wrap, #sp-bar-wrap {
+  background: #14121e; border: 3px solid var(--cp-wood-dark);
+  box-shadow: inset 0 0 0 1px #000; border-radius: 0; overflow: hidden;
+}
+#hp-bar, #xp-bar, #st-bar, #sp-bar { border-radius: 0; }
+#boss-bar { background: var(--cp-panel); border: 3px solid var(--cp-wood-dark);
+  box-shadow: inset 0 0 0 2px var(--cp-wood-frame); border-radius: 0; }
+#boss-name { color: var(--cp-accent-hi); }
+#boss-hp-wrap { background: #14121e; border: 2px solid var(--cp-wood-dark); border-radius: 0; }
+
+/* ═══ Craftpix skin · Task 4: shop (dark dungeon) ═══ */
+.shop-item.offer, .shop-item.small {
+  background: var(--cp-panel-edge); color: var(--cp-ink-light);
+  border: 3px solid var(--cp-wood-dark);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,0.06), inset 0 -3px 0 rgba(0,0,0,0.35);
+  border-radius: 0;
+}
+.shop-item.offer:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-2px); }
+.shop-name { color: var(--cp-ink-light); }
+.shop-price { color: #e0b24a; font-family: var(--display-font); }
+.slot-chip { background: var(--cp-panel-edge); border: 3px solid var(--cp-wood-dark);
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,0.3), inset -2px -2px 0 rgba(255,255,255,0.06); border-radius: 0; }
+.slot-chip.empty { background: var(--cp-slot-empty); }
+.slot-lbl { color: var(--cp-ink-dark); }
+.shop-section-label { color: var(--cp-ink-dark); }
+.shop-stats { background: var(--cp-panel-edge); border: 3px solid var(--cp-wood-dark);
+  box-shadow: inset 0 0 0 2px var(--cp-wood-frame); border-radius: 0; color: var(--cp-ink-light); }
+.stat-line { border-bottom: 2px dotted rgba(199,195,224,0.2); }
+.stat-line span:last-child { color: #8fbf6a; }
+.shop-price::after { content: ' G'; } /* pixel font lacks the ¤ glyph */
