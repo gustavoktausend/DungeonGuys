@@ -1297,7 +1297,7 @@ html, body {
 .class-desc, .footer-hint, .inst-row, .cval, .cdesc { font-size: clamp(9px, 1.4vw, 12px) !important; }
 
 /* ═══ Craftpix skin · Task 2 fix: text contrast on the cream panel ═══ */
-.title-main { color: var(--torch-orange) !important; text-shadow: 0 3px 0 rgba(0,0,0,0.4); }
+.title-glow, .title-main { color: #2e6da4 !important; text-shadow: 0 3px 0 rgba(0,0,0,0.35) !important; animation: none !important; }
 .class-select-label, .color-label, .cval, .ch, .footer-hint, .inst-row,
 #class-record, .name-picker .color-label, .levelup-sub { color: var(--cp-ink-dark) !important; }
 .inst-row .key { color: var(--cp-ink-light) !important; background: var(--cp-header); border-color: var(--cp-wood-dark); }
