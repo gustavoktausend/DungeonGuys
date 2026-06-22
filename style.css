@@ -1294,3 +1294,12 @@ html, body {
 .cslider input[type="range"]::-moz-range-thumb { background: var(--cp-btn); border-color: var(--cp-wood-dark); }
 .class-name              { font-size: clamp(9px, 1.5vw, 12px) !important; }
 .class-desc, .footer-hint, .inst-row, .cval, .cdesc { font-size: clamp(9px, 1.4vw, 12px) !important; }
+
+/* ═══ Craftpix skin · Task 2 fix: text contrast on the cream panel ═══ */
+.title-main { color: var(--torch-orange) !important; text-shadow: 0 3px 0 rgba(0,0,0,0.4); }
+.class-select-label, .color-label, .cval, .ch, .footer-hint, .inst-row,
+#class-record, .name-picker .color-label, .levelup-sub { color: var(--cp-ink-dark) !important; }
+.inst-row .key { color: var(--cp-ink-light) !important; background: var(--cp-header); border-color: var(--cp-wood-dark); }
+.class-card .class-name { color: #7a3b1f !important; }
+.class-card .class-desc { color: var(--cp-ink-dark) !important; }
+.class-card.selected .class-name, .class-card.selected .class-desc { color: var(--cp-ink-light) !important; }
